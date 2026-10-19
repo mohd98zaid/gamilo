@@ -1,0 +1,5 @@
+# Robots.txt for Gmailo Marketing OS
+User-agent: *
+Allow: /
+Disallow: /dashboard/
+Disallow: /api/

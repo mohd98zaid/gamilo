@@ -1,0 +1,20 @@
+node_modules/
+.next/
+coverage/
+playwright-report/
+test-results/
+*.log
+.env
+.env.*
+!.env.example
+*.db
+*.db-journal
+.DS_Store
+Thumbs.db
+
+# Local editor and OS files
+.vscode/
+.idea/
+
+# Generated Prisma artifacts
+prisma/generated/

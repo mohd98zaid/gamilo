@@ -1,0 +1,221 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  passwordHash  String?
+  name          String?
+  avatarUrl     String?
+  emailVerified DateTime?
+  workspaces    WorkspaceMember[]
+  sessions      Session[]
+  apiKeys       ApiKey[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String   @unique
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+}
+
+model ApiKey {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  keyHash       String   @unique
+  keyPrefix     String
+  scopes        String   // comma-separated scopes: "social:read,social:write"
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+}
+
+model Workspace {
+  id            String      @id @default(cuid())
+  name          String
+  slug          String      @unique
+  logoUrl       String?
+  members       WorkspaceMember[]
+  channels      Channel[]
+  posts         Post[]
+  threads       Thread[]
+  campaigns     Campaign[]
+  automations   Automation[]
+  apiKeys       ApiKey[]
+  subscription  Subscription?
+  brandSettings BrandSettings?
+  auditLogs     AuditLog[]
+  aiCredits     Int         @default(100)
+  trialEndsAt   DateTime
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model WorkspaceMember {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role          String    @default("EDITOR") // OWNER, ADMIN, EDITOR, VIEWER
+  joinedAt      DateTime  @default(now())
+}
+
+model BrandSettings {
+  id            String    @id @default(cuid())
+  workspaceId   String    @unique
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  businessName  String
+  industry      String
+  tone          String    @default("friendly") // friendly, professional, casual, bold
+  description   String?
+  brandKnowledge String?
+  primaryColor  String?
+  updatedAt     DateTime  @updatedAt
+}
+
+model Channel {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platform      String    // INSTAGRAM, FACEBOOK, TIKTOK, YOUTUBE, WHATSAPP, GMAIL
+  platformId    String
+  name          String
+  accessToken   String    // AES-256 encrypted
+  refreshToken  String?   // AES-256 encrypted
+  tokenExpiry   DateTime?
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  posts         PostChannel[]
+  createdAt     DateTime  @default(now())
+}
+
+model Post {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  caption       String
+  mediaUrls     String    // JSON string array
+  status        String    @default("DRAFT") // DRAFT, SCHEDULED, PUBLISHING, PUBLISHED, FAILED
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  channels      PostChannel[]
+  metrics       PostMetric[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model PostChannel {
+  id            String    @id @default(cuid())
+  postId        String
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  channelId     String
+  channel       Channel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  platformPostId String?
+  status        String    @default("PENDING")
+  error         String?
+}
+
+model PostMetric {
+  id            String    @id @default(cuid())
+  postId        String
+  post          Post      @relation(fields: [postId], references: [id], onDelete: Cascade)
+  impressions   Int       @default(0)
+  reach         Int       @default(0)
+  likes         Int       @default(0)
+  comments      Int       @default(0)
+  shares        Int       @default(0)
+  recordedAt    DateTime  @default(now())
+}
+
+model Thread {
+  id               String    @id @default(cuid())
+  workspaceId      String
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  platform         String    // INSTAGRAM, FACEBOOK, GMAIL, WHATSAPP
+  platformThreadId String
+  contactName      String
+  contactAvatar    String?
+  lastMessageAt    DateTime  @default(now())
+  isRead           Boolean   @default(false)
+  labels           String    @default("[]") // JSON string array of tags
+  messages         Message[]
+}
+
+model Message {
+  id            String    @id @default(cuid())
+  threadId      String
+  thread        Thread    @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  direction     String    // INBOUND, OUTBOUND
+  content       String
+  platformMsgId String?
+  sentAt        DateTime  @default(now())
+}
+
+model Campaign {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  type          String    // EMAIL, WHATSAPP
+  status        String    @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  createdAt     DateTime  @default(now())
+}
+
+model Automation {
+  id            String    @id @default(cuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name          String
+  triggerType   String    // COMMENT_KEYWORD, NEW_FOLLOWER, INBOX_KEYWORD
+  triggerConfig String    // JSON config
+  actionType    String    // AUTO_REPLY, SEND_DM
+  actionConfig  String    // JSON config
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+}
+
+model Subscription {
+  id               String    @id @default(cuid())
+  workspaceId      String    @unique
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  stripeCustomerId String?
+  stripeSubId      String?
+  plan             String    @default("TRIAL") // TRIAL, STARTER, SCALE, ENTERPRISE
+  status           String    @default("active")
+  currentPeriodEnd DateTime?
+}
+
+model AuditLog {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  resource    String
+  resourceId  String?
+  ipAddress   String?
+  timestamp   DateTime  @default(now())
+}

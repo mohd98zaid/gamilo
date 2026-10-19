@@ -1,0 +1,7 @@
+node_modules
+.next
+.git
+.agents
+npm-debug.log*
+.DS_Store
+*.md
