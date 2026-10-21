@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Inbox,
   Sparkles,
@@ -30,20 +30,22 @@ export default function InboxPage() {
   const [newTagInput, setNewTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  useEffect(() => {
-    fetchThreads();
-  }, []);
-
-  async function fetchThreads() {
+  const fetchThreads = useCallback(async () => {
     try {
       const res = await fetch('/api/inbox/threads');
       const data = await res.json();
       setThreads(data.threads || []);
-      if (data.threads?.length > 0 && !activeThreadId) {
-        setActiveThreadId(data.threads[0].id);
+      if (data.threads?.length > 0) {
+        setActiveThreadId((current) => current || data.threads[0].id);
       }
     } catch {}
-  }
+  }, []);
+
+  useEffect(() => {
+    // The effect synchronizes remote inbox data after the client mounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchThreads();
+  }, [fetchThreads]);
 
   // Filter threads by search query & platform
   const filteredThreads = threads.filter((t) => {

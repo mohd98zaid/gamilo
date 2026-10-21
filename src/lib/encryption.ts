@@ -1,4 +1,5 @@
 import crypto from 'crypto';
+import { getRuntimeConfig } from './config';
 
 /**
  * AES-256-GCM Token Encryption Vault
@@ -11,7 +12,14 @@ const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function getKey(): Buffer {
-  const secret = process.env.TOKEN_ENCRYPTION_KEY || process.env.APP_SECRET || '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+  const config = getRuntimeConfig();
+  const secret = config.TOKEN_ENCRYPTION_KEY || config.APP_SECRET;
+  if (!secret) {
+    if (config.NODE_ENV === 'test') {
+      return crypto.createHash('sha256').update('vitest-only-encryption-key').digest();
+    }
+    throw new Error('TOKEN_ENCRYPTION_KEY or APP_SECRET must be configured before encrypting secrets');
+  }
   if (secret.length === 64) {
     return Buffer.from(secret, 'hex');
   }

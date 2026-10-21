@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/db';
+import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth();
+    if (auth instanceof NextResponse) return auth;
+    if (auth) {
+      return NextResponse.json({ error: 'Billing provider integration is not configured yet' }, { status: 501 });
+    }
     const { planId, interval } = await req.json();
 
     if (!planId) {

@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/db';
+import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const post = store.posts.find((p) => p.id === params.id);
+  const { id } = await params;
+  const auth = await requireApiAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (auth) {
+    return NextResponse.json({ error: 'Publishing provider integration is not configured yet' }, { status: 501 });
+  }
+  const post = store.posts.find((p) => p.id === id);
   if (!post) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 });
   }

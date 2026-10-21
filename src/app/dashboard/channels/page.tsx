@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Share2,
   CheckCircle2,
@@ -21,6 +22,7 @@ import {
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 
 export default function ChannelsPage() {
+  const router = useRouter();
   const [channels, setChannels] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState('INSTAGRAM');
@@ -86,11 +88,15 @@ export default function ChannelsPage() {
 
     try {
       const isEmail = selectedPlatform === 'GMAIL' || selectedPlatform === 'EMAIL';
+      if (selectedPlatform === 'GMAIL') {
+        router.push('/api/integrations/gmail/start');
+        return;
+      }
       const payload: any = {
         platform: selectedPlatform,
         name: isEmail ? (emailSenderName ? `${emailSenderName} (${emailAddress})` : emailAddress) : accountName,
         platformId: isEmail ? emailAddress : `pid_${Date.now()}`,
-        accessToken: isEmail ? emailSecret : 'gml_token_' + Math.random().toString(36).substring(2),
+        accessToken: isEmail ? emailSecret : undefined,
       };
 
       if (isEmail) {

@@ -51,7 +51,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       const data = await res.json();
       expect(data.success).toBe(true);
       expect(data.channel.platform).toBe('GMAIL');
-      expect(data.channel.accessToken.startsWith('enc:v1:')).toBe(true);
+      expect(data.channel.accessToken).toBeUndefined();
       expect(data.channel.emailConfig.smtpHost).toBe('smtp.gmail.com');
     });
 

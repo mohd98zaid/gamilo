@@ -202,7 +202,7 @@ export default function DashboardPage() {
                     <span className="text-[10px] text-brand font-semibold">15m ago</span>
                   </div>
                   <p className="text-xs text-foreground-muted line-clamp-2">
-                    "Do you have any gluten-free pastries tomorrow? Also extra charge for oat milk?"
+                    &quot;Do you have any gluten-free pastries tomorrow? Also extra charge for oat milk?&quot;
                   </p>
                   <div className="mt-2 flex items-center justify-between">
                     <span className="text-[10px] text-foreground-subtle font-medium">Instagram DM</span>
@@ -221,7 +221,7 @@ export default function DashboardPage() {
                     <span className="text-[10px] text-foreground-subtle">2h ago</span>
                   </div>
                   <p className="text-xs text-foreground-muted line-clamp-1">
-                    "Looking to host a team coffee workshop for 12 people..."
+                    &quot;Looking to host a team coffee workshop for 12 people...&quot;
                   </p>
                   <span className="text-[10px] text-foreground-subtle font-medium mt-1 block">Facebook Inquiry</span>
                 </div>

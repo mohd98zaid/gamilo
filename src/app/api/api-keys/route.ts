@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/api-keys';
+import { createApiKeySchema } from '@/lib/validators';
+import { requireApiAuth } from '@/lib/api-auth';
+import { prisma } from '@/lib/prisma';
 
 interface StoredApiKey {
   id: string;
@@ -23,6 +26,12 @@ const apiKeysStore: StoredApiKey[] = [
 ];
 
 export async function GET() {
+  const auth = await requireApiAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (auth) {
+    const keys = await prisma.apiKey.findMany({ where: { workspaceId: auth.workspaceId, isActive: true }, select: { id: true, name: true, keyPrefix: true, createdAt: true, isActive: true, expiresAt: true }, orderBy: { createdAt: 'desc' } });
+    return NextResponse.json({ keys });
+  }
   return NextResponse.json({
     keys: apiKeysStore.map(({ id, name, keyPrefix, createdAt, isActive }) => ({
       id,
@@ -36,12 +45,22 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { name } = await req.json();
+    const auth = await requireApiAuth();
+    if (auth instanceof NextResponse) return auth;
+    const parsed = createApiKeySchema.safeParse(await req.json());
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
+    }
     const generated = generateApiKey();
+
+    if (auth) {
+      const key = await prisma.apiKey.create({ data: { userId: auth.id, workspaceId: auth.workspaceId, name: parsed.data.name, keyHash: generated.keyHash, keyPrefix: generated.keyPrefix, scopes: parsed.data.scopes.join(',') } });
+      return NextResponse.json({ success: true, key: generated.key, keyPrefix: generated.keyPrefix, id: key.id }, { status: 201 });
+    }
 
     const newKeyRecord: StoredApiKey = {
       id: `key_${Date.now()}`,
-      name: name || 'API Key',
+      name: parsed.data.name,
       keyPrefix: generated.keyPrefix,
       keyHash: generated.keyHash,
       createdAt: new Date().toISOString(),
@@ -68,11 +87,19 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const auth = await requireApiAuth();
+  if (auth instanceof NextResponse) return auth;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');
 
   if (!id) {
     return NextResponse.json({ error: 'Key id is required' }, { status: 400 });
+  }
+
+  if (auth) {
+    const revoked = await prisma.apiKey.updateMany({ where: { id, workspaceId: auth.workspaceId, isActive: true }, data: { isActive: false } });
+    if (revoked.count === 0) return NextResponse.json({ error: 'API key not found' }, { status: 404 });
+    return NextResponse.json({ success: true, message: 'API key revoked' });
   }
 
   const index = apiKeysStore.findIndex((k) => k.id === id);

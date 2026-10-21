@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/db';
+import { getCurrentUser, isTestEnvironment } from '@/lib/auth';
 
 export async function GET() {
+  if (!isTestEnvironment()) {
+    const user = await getCurrentUser();
+    if (!user) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
+    return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email, avatarUrl: user.avatarUrl }, workspace: user.workspace });
+  }
+
   return NextResponse.json({
     user: {
       id: 'usr_demo_1',

@@ -247,7 +247,7 @@ export default function LandingPage() {
             All 8 Essential Modules In One Workspace
           </p>
           <p className="mt-4 text-foreground-muted">
-            Designed specifically for small business owners and marketing teams who don't want to manage 10 logins.
+            Designed specifically for small business owners and marketing teams who don&apos;t want to manage 10 logins.
           </p>
         </div>
 

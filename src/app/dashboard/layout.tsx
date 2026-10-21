@@ -1,13 +1,18 @@
-'use client';
-
 import React from 'react';
+import { redirect } from 'next/navigation';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
+import { getCurrentUser, isTestEnvironment } from '@/lib/auth';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  if (!isTestEnvironment()) {
+    const user = await getCurrentUser();
+    if (!user) redirect('/login');
+  }
+
   return (
     <div className="flex min-h-screen bg-background text-foreground">
       <DashboardSidebar />

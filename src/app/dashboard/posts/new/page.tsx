@@ -29,6 +29,8 @@ function CreatePostContent() {
 
   React.useEffect(() => {
     const c = searchParams.get('caption');
+    // Hydrate form state from calendar query parameters once the client mounts.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (c) setCaption(c);
     const d = searchParams.get('date');
     if (d) setScheduledAt(`${d}T09:00`);

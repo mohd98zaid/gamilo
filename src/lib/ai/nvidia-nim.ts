@@ -5,6 +5,7 @@
  */
 
 import { withRetry } from '../errors';
+import { getRuntimeConfig, requireConfigured } from '../config';
 
 export interface GenerateTextOptions {
   systemPrompt?: string;
@@ -23,17 +24,13 @@ export class NvidiaNimClient {
   public temperature: number;
 
   constructor() {
-    this.apiKey =
-      process.env.NVIDIA_API_KEY ||
-      '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';
-    this.baseUrl = (
-      process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1'
-    ).replace(/\/$/, '');
-    this.primaryModel = process.env.NVIDIA_PRIMARY_MODEL || 'openai/gpt-oss-20b';
-    this.fallbackModel =
-      process.env.NVIDIA_FALLBACK_MODEL || 'nvidia/nemotron-3.5-lightning-30b-a3b';
-    this.maxTokens = parseInt(process.env.NVIDIA_MAX_OUTPUT_TOKENS || '2048', 10);
-    this.temperature = parseFloat(process.env.NVIDIA_TEMPERATURE || '0.1');
+    const config = getRuntimeConfig(false);
+    this.apiKey = config.NVIDIA_API_KEY || '';
+    this.baseUrl = config.NVIDIA_BASE_URL.replace(/\/$/, '');
+    this.primaryModel = config.NVIDIA_PRIMARY_MODEL;
+    this.fallbackModel = config.NVIDIA_FALLBACK_MODEL || '';
+    this.maxTokens = config.NVIDIA_MAX_OUTPUT_TOKENS;
+    this.temperature = config.NVIDIA_TEMPERATURE;
   }
 
   private async callModelEndpoint(
@@ -42,12 +39,18 @@ export class NvidiaNimClient {
     maxTokens: number,
     temperature: number
   ): Promise<string> {
+    const apiKey = requireConfigured(this.apiKey, 'NVIDIA_API_KEY');
     const url = `${this.baseUrl}/chat/completions`;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30_000);
+
+    try {
     const response = await fetch(url, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -58,8 +61,8 @@ export class NvidiaNimClient {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`NVIDIA NIM API error (${response.status}): ${errText}`);
+      await response.body?.cancel();
+      throw new Error(`NVIDIA NIM API request failed with status ${response.status}`);
     }
 
     const data = await response.json();
@@ -79,7 +82,17 @@ export class NvidiaNimClient {
       text = choice.text || '';
     }
 
-    return (text || '').trim();
+    const result = (text || '').trim();
+    if (!result) throw new Error('NVIDIA NIM returned an empty response');
+    return result;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('NVIDIA NIM request timed out');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   /**
@@ -114,7 +127,7 @@ export class NvidiaNimClient {
         durationMs: Date.now() - start,
       };
     } catch (primaryErr) {
-      console.warn(`Primary model ${requestedModel} failed, trying fallback ${this.fallbackModel}:`, primaryErr);
+      console.warn(`Primary model ${requestedModel} failed; fallback configured: ${Boolean(this.fallbackModel)}`);
 
       // 2. If fallback model is distinct, attempt fallback
       if (this.fallbackModel && this.fallbackModel !== requestedModel) {
@@ -129,9 +142,7 @@ export class NvidiaNimClient {
             durationMs: Date.now() - start,
           };
         } catch (fallbackErr) {
-          throw new Error(
-            `All NVIDIA NIM models failed. Primary error: ${primaryErr instanceof Error ? primaryErr.message : String(primaryErr)}. Fallback error: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`
-          );
+          throw new Error('All configured NVIDIA NIM models failed');
         }
       }
 

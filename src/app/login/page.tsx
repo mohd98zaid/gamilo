@@ -7,22 +7,28 @@ import { Sparkles, ArrowRight, Lock, Mail } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('sarah@brewhaven.coffee');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     try {
-      await fetch('/api/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : 'Unable to sign in');
+      }
       router.push('/dashboard');
-    } catch {
-      router.push('/dashboard');
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Unable to sign in');
     } finally {
       setIsLoading(false);
     }
@@ -43,6 +49,7 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
+          {error && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-300">{error}</p>}
           <div>
             <label className="block text-xs font-semibold text-foreground-muted mb-1.5">Email address</label>
             <div className="relative">
@@ -85,7 +92,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 pt-6 border-t border-border text-center text-xs text-foreground-muted">
-          Don't have an account?{' '}
+          Don&apos;t have an account?{' '}
           <Link href="/register" className="text-brand font-semibold hover:underline">
             Start 30-Day Free Trial
           </Link>

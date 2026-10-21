@@ -2,12 +2,17 @@ import { NextResponse } from 'next/server';
 import { store } from '@/lib/db';
 import { AIPrompts } from '@/lib/ai/prompts';
 import { nvidiaNim } from '@/lib/ai/nvidia-nim';
+import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const thread = store.threads.find((t) => t.id === params.id);
+  const { id } = await params;
+  const auth = await requireApiAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (auth) return NextResponse.json({ error: 'Inbox AI suggestions require the persisted inbox adapter, which is not configured yet' }, { status: 501 });
+  const thread = store.threads.find((t) => t.id === id);
   if (!thread) {
     return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
   }

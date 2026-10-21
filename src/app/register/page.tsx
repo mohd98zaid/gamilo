@@ -12,19 +12,25 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
     try {
-      await fetch('/api/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password, workspaceName }),
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(typeof data.error === 'string' ? data.error : 'Unable to create account');
+      }
       router.push('/dashboard');
-    } catch {
-      router.push('/dashboard');
+    } catch (registrationError) {
+      setError(registrationError instanceof Error ? registrationError.message : 'Unable to create account');
     } finally {
       setIsLoading(false);
     }
@@ -45,6 +51,7 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">
+          {error && <p role="alert" className="rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2 text-xs text-red-300">{error}</p>}
           <div>
             <label className="block text-xs font-semibold text-foreground-muted mb-1.5">Your Full Name</label>
             <div className="relative">
@@ -99,6 +106,7 @@ export default function RegisterPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={12}
                 required
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-sm focus:outline-none focus:border-brand"
               />

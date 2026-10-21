@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 import { store } from '@/lib/db';
 import { sendReplySchema } from '@/lib/validators';
+import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
-  const thread = store.threads.find((t) => t.id === params.id);
+  const { id } = await params;
+  const auth = await requireApiAuth();
+  if (auth instanceof NextResponse) return auth;
+  if (auth) return NextResponse.json({ error: 'Inbox delivery provider integration is not configured yet' }, { status: 501 });
+  const thread = store.threads.find((t) => t.id === id);
   if (!thread) {
     return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
   }
 
   try {
     const json = await req.json();
-    const parsed = sendReplySchema.safeParse({ ...json, threadId: params.id });
+    const parsed = sendReplySchema.safeParse({ ...json, threadId: id });
 
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
@@ -34,8 +39,9 @@ export async function POST(
 
     return NextResponse.json({ success: true, message: newMsg });
   } catch (error) {
+    console.error('Inbox reply failed', { error: error instanceof Error ? error.name : 'unknown' });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Failed to send reply' },
+      { error: 'Failed to send reply' },
       { status: 500 }
     );
   }
