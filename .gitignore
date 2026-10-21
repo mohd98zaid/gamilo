@@ -15,7 +15,6 @@ Thumbs.db
 # Local editor and OS files
 .vscode/
 .idea/
-.agents/
 *.tsbuildinfo
 
 # Generated Prisma artifacts
