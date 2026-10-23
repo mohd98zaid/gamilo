@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { generateApiKey } from '@/lib/api-keys';
-import { createApiKeySchema } from '@/lib/validators';
+import { createApiKeySchema } from '@/features/api-keys/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 
@@ -13,20 +13,11 @@ interface StoredApiKey {
   isActive: boolean;
 }
 
-// In-memory key store
-const apiKeysStore: StoredApiKey[] = [
-  {
-    id: 'key_default_1',
-    name: 'Production Primary Key',
-    keyPrefix: 'gml_live_9f82a1b',
-    keyHash: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-    createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    isActive: true,
-  },
-];
+// Test-only compatibility store. Production reads and writes Prisma records.
+const apiKeysStore: StoredApiKey[] = [];
 
 export async function GET() {
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('ADMIN');
   if (auth instanceof NextResponse) return auth;
   if (auth) {
     const keys = await prisma.apiKey.findMany({ where: { workspaceId: auth.workspaceId, isActive: true }, select: { id: true, name: true, keyPrefix: true, createdAt: true, isActive: true, expiresAt: true }, orderBy: { createdAt: 'desc' } });
@@ -45,7 +36,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAuth();
+    const auth = await requireApiAuth('ADMIN');
     if (auth instanceof NextResponse) return auth;
     const parsed = createApiKeySchema.safeParse(await req.json());
     if (!parsed.success) {
@@ -87,7 +78,7 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('ADMIN');
   if (auth instanceof NextResponse) return auth;
   const { searchParams } = new URL(req.url);
   const id = searchParams.get('id');

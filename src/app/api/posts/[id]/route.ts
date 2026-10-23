@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
-import { updatePostSchema } from '@/lib/validators';
 import { requireApiAuth } from '@/lib/api-auth';
-import { prisma } from '@/lib/prisma';
+import { getPostRepository, updatePostSchema } from '@/features/posts';
 
 export async function GET(
   req: Request,
@@ -11,12 +9,8 @@ export async function GET(
   const { id } = await params;
   const auth = await requireApiAuth();
   if (auth instanceof NextResponse) return auth;
-  if (auth) {
-    const post = await prisma.post.findFirst({ where: { id, workspaceId: auth.workspaceId }, include: { channels: true, metrics: { orderBy: { recordedAt: 'desc' }, take: 1 } } });
-    if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
-    return NextResponse.json({ post: { ...post, mediaUrls: JSON.parse(post.mediaUrls), channelIds: post.channels.map((channel) => channel.channelId), metrics: post.metrics[0] ?? undefined } });
-  }
-  const post = store.posts.find((p) => p.id === id);
+  const workspaceId = auth?.workspaceId ?? 'test-workspace';
+  const post = await getPostRepository().findById({ workspaceId, id });
   if (!post) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 });
   }
@@ -28,29 +22,17 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   const { id } = await params;
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('EDITOR');
   if (auth instanceof NextResponse) return auth;
-  if (auth) {
-    const parsed = updatePostSchema.safeParse(await req.json());
-    if (!parsed.success) return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
-    const data = parsed.data;
-    const updated = await prisma.post.updateMany({ where: { id, workspaceId: auth.workspaceId }, data: { ...(data.caption !== undefined ? { caption: data.caption } : {}), ...(data.status !== undefined ? { status: data.status } : {}), ...(data.scheduledAt !== undefined ? { scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null } : {}), ...(data.mediaUrls !== undefined ? { mediaUrls: JSON.stringify(data.mediaUrls) } : {}) } });
-    if (updated.count === 0) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
-    const post = await prisma.post.findUnique({ where: { id }, include: { channels: true } });
-    return NextResponse.json({ success: true, post: { ...post, mediaUrls: JSON.parse(post!.mediaUrls), channelIds: post!.channels.map((channel) => channel.channelId) } });
-  }
-  const post = store.posts.find((p) => p.id === id);
-  if (!post) {
-    return NextResponse.json({ error: 'Post not found' }, { status: 404 });
-  }
-
+  const workspaceId = auth?.workspaceId ?? 'test-workspace';
   try {
     const parsed = updatePostSchema.safeParse(await req.json());
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
     }
-    Object.assign(post, parsed.data);
-    return NextResponse.json({ success: true, post });
+    const updated = await getPostRepository().update({ workspaceId, id }, parsed.data);
+    if (!updated) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    return NextResponse.json({ success: true, post: updated });
   } catch (error) {
     return NextResponse.json({ error: 'Failed to update post' }, { status: 500 });
   }
@@ -61,18 +43,12 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   const { id } = await params;
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('EDITOR');
   if (auth instanceof NextResponse) return auth;
-  if (auth) {
-    const deleted = await prisma.post.deleteMany({ where: { id, workspaceId: auth.workspaceId } });
-    if (deleted.count === 0) return NextResponse.json({ error: 'Post not found' }, { status: 404 });
-    return NextResponse.json({ success: true, message: 'Post deleted' });
-  }
-  const index = store.posts.findIndex((p) => p.id === id);
-  if (index === -1) {
+  const workspaceId = auth?.workspaceId ?? 'test-workspace';
+  const deleted = await getPostRepository().delete({ workspaceId, id });
+  if (!deleted) {
     return NextResponse.json({ error: 'Post not found' }, { status: 404 });
   }
-
-  store.posts.splice(index, 1);
   return NextResponse.json({ success: true, message: 'Post deleted' });
 }

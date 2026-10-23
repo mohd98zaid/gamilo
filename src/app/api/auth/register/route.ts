@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { registerSchema } from '@/lib/validators';
-import { store } from '@/lib/db';
+import { registerSchema } from '@/features/auth/schemas';
+import { store } from '@/features/testing/store';
 import bcrypt from 'bcryptjs';
 import { createSession, isTestEnvironment, setSessionCookie } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
@@ -60,6 +60,9 @@ export async function POST(req: Request) {
       workspace: store.workspace,
     }, { status: 201 });
   } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json({ error: 'An account with this email already exists' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Registration failed' }, { status: 500 });
   }
 }

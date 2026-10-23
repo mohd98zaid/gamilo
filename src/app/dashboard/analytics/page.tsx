@@ -24,32 +24,20 @@ export default function AnalyticsPage() {
   }, []);
 
   const metrics = data?.metrics || {
-    totalImpressions: 1420,
-    totalReach: 1180,
-    totalEngagement: 225,
-    engagementRate: '19.1%',
+    totalImpressions: 0,
+    totalReach: 0,
+    totalEngagement: 0,
+    engagementRate: '0.0%',
   };
 
-  const topPosts = [
-    {
-      title: 'Fresh batch of Ethiopian Yirgacheffe roasted this morning! ☕',
-      platform: 'Instagram',
-      impressions: 1420,
-      likes: 184,
-      comments: 29,
-      shares: 12,
-      reach: 1180,
-    },
-    {
-      title: 'Weekend pastry preview: Cinnamon cardamom brioche knots...',
-      platform: 'Facebook',
-      impressions: 890,
-      likes: 92,
-      comments: 14,
-      shares: 6,
-      reach: 750,
-    },
-  ];
+  const topPosts = (data?.recentPosts || []).filter((post: any) => post.metrics).map((post: any) => ({
+    title: post.caption,
+    platform: post.channelIds?.join(', ') || 'Connected channels',
+    likes: post.metrics.likes || 0,
+    comments: post.metrics.comments || 0,
+    shares: post.metrics.shares || 0,
+    reach: post.metrics.reach || 0,
+  }));
 
   return (
     <>
@@ -68,7 +56,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.totalReach.toLocaleString()}</div>
             <div className="text-[11px] text-brand font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +14.2% this month
+              <TrendingUp className="w-3 h-3" /> Provider-derived data
             </div>
           </div>
 
@@ -79,7 +67,7 @@ export default function AnalyticsPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.totalImpressions.toLocaleString()}</div>
             <div className="text-[11px] text-brand font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +18.5% this month
+              <TrendingUp className="w-3 h-3" /> Provider-derived data
             </div>
           </div>
 
@@ -89,7 +77,7 @@ export default function AnalyticsPage() {
               <Heart className="w-4 h-4 text-pink-400" />
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.engagementRate}</div>
-            <div className="text-[11px] text-foreground-subtle mt-1 font-medium">Industry avg: 3.2%</div>
+            <div className="text-[11px] text-foreground-subtle mt-1 font-medium">No benchmark configured</div>
           </div>
 
           <div className="p-5 rounded-2xl bg-surface border border-border">
@@ -122,7 +110,11 @@ export default function AnalyticsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60 text-foreground">
-                {topPosts.map((post, idx) => (
+                {topPosts.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="p-6 text-center text-foreground-subtle">No provider metrics are available yet.</td>
+                  </tr>
+                ) : topPosts.map((post: any, idx: number) => (
                   <tr key={idx} className="hover:bg-surface-2/30">
                     <td className="p-3 max-w-sm font-medium line-clamp-1">{post.title}</td>
                     <td className="p-3">

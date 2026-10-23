@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
+import { store } from '@/features/testing/store';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 
@@ -8,7 +8,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   const { id } = await params;
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('ADMIN');
   if (auth instanceof NextResponse) return auth;
   if (auth) {
     const result = await prisma.channel.updateMany({ where: { id, workspaceId: auth.workspaceId }, data: { isActive: false } });

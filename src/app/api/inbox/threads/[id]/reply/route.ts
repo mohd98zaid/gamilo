@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
-import { sendReplySchema } from '@/lib/validators';
+import { store } from '@/features/testing/store';
+import { sendReplySchema } from '@/features/inbox/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   const { id } = await params;
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('EDITOR');
   if (auth instanceof NextResponse) return auth;
   if (auth) return NextResponse.json({ error: 'Inbox delivery provider integration is not configured yet' }, { status: 501 });
   const thread = store.threads.find((t) => t.id === id);

@@ -20,10 +20,10 @@ function getKey(): Buffer {
     }
     throw new Error('TOKEN_ENCRYPTION_KEY or APP_SECRET must be configured before encrypting secrets');
   }
-  if (secret.length === 64) {
-    return Buffer.from(secret, 'hex');
+  if (!/^[a-f0-9]{64}$/i.test(secret)) {
+    throw new Error('Encryption key must be a 64-character hexadecimal value');
   }
-  return crypto.createHash('sha256').update(secret).digest();
+  return Buffer.from(secret, 'hex');
 }
 
 export interface EncryptedData {
@@ -56,6 +56,9 @@ export function decrypt(data: EncryptedData): string {
   const key = getKey();
   const iv = Buffer.from(data.iv, 'base64');
   const tag = Buffer.from(data.tag, 'base64');
+  if (iv.length !== IV_LENGTH || tag.length !== TAG_LENGTH) {
+    throw new Error('Invalid encrypted data nonce or authentication tag');
+  }
 
   const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
   decipher.setAuthTag(tag);
@@ -77,8 +80,7 @@ export function encryptToString(text: string): string {
 
 export function decryptFromString(encoded: string): string {
   if (!encoded || !encoded.startsWith('enc:v1:')) {
-    // If not encrypted (e.g. legacy plain text), return as is for resilience
-    return encoded;
+    throw new Error('Encrypted value must use the enc:v1 format');
   }
   const parts = encoded.split(':');
   if (parts.length !== 5) {

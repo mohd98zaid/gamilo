@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { loginSchema } from '@/lib/validators';
-import { store } from '@/lib/db';
+import { loginSchema } from '@/features/auth/schemas';
+import { store } from '@/features/testing/store';
 import bcrypt from 'bcryptjs';
-import { createSession, isTestEnvironment, setSessionCookie } from '@/lib/auth';
+import { createSession, deleteCurrentSession, isTestEnvironment, setSessionCookie } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
@@ -17,11 +17,11 @@ export async function POST(req: Request) {
     if (isTestEnvironment()) {
       return NextResponse.json({
       success: true,
-      token: 'test-only-session',
+      token: 'test-session-only',
       user: {
-        id: 'usr_demo_1',
+        id: 'test-user',
         email: parsed.data.email,
-        name: 'Demo User',
+        name: 'Test User',
       },
       workspace: store.workspace,
       });
@@ -29,15 +29,23 @@ export async function POST(req: Request) {
 
     const user = await prisma.user.findUnique({
       where: { email: parsed.data.email.toLowerCase() },
-      include: { workspaces: { include: { workspace: true }, take: 1 } },
+      include: { workspaces: { include: { workspace: true }, orderBy: { joinedAt: 'asc' }, take: 1 } },
     });
     if (!user?.passwordHash || !(await bcrypt.compare(parsed.data.password, user.passwordHash))) {
       return NextResponse.json({ error: 'Invalid email or password' }, { status: 401 });
     }
 
+    const membership = user.workspaces[0];
+    if (!membership) {
+      return NextResponse.json({ error: 'No workspace membership found' }, { status: 403 });
+    }
+
+    // Replace any browser session only after credentials have been verified.
+    // This prevents session fixation and removes a stale session when changing
+    // accounts in the same browser.
+    await deleteCurrentSession();
     const rawSession = await createSession(user.id);
     await setSessionCookie(rawSession);
-    const membership = user.workspaces[0];
     return NextResponse.json({
       success: true,
       user: { id: user.id, email: user.email, name: user.name },

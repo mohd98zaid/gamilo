@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
+import { store } from '@/features/testing/store';
 import { getCurrentUser, isTestEnvironment } from '@/lib/auth';
 
 export async function GET() {
@@ -11,10 +11,9 @@ export async function GET() {
 
   return NextResponse.json({
     user: {
-      id: 'usr_demo_1',
-      name: 'Sarah Jenkins',
-      email: 'sarah@brewhaven.coffee',
-      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100',
+      id: 'test-user',
+      name: 'Test User',
+      email: 'test@example.test',
     },
     workspace: {
       id: store.workspace.id,

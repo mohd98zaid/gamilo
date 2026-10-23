@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
+import { store } from '@/features/testing/store';
 import { requireApiAuth } from '@/lib/api-auth';
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAuth();
+    const auth = await requireApiAuth('ADMIN');
     if (auth instanceof NextResponse) return auth;
     if (auth) {
       return NextResponse.json({ error: 'Billing provider integration is not configured yet' }, { status: 501 });

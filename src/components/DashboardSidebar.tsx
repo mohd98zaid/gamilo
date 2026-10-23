@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
@@ -19,12 +19,25 @@ import { cn } from '@/lib/utils';
 
 export function DashboardSidebar() {
   const pathname = usePathname();
+  const [workspace, setWorkspace] = useState<any>(null);
+  const [trialDays, setTrialDays] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => {
+        const nextWorkspace = data?.workspace ?? null;
+        setWorkspace(nextWorkspace);
+        setTrialDays(nextWorkspace?.trialEndsAt ? Math.max(0, Math.ceil((new Date(nextWorkspace.trialEndsAt).getTime() - Date.now()) / 86400000)) : null);
+      })
+      .catch(() => setWorkspace(null));
+  }, []);
 
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Content Calendar', href: '/dashboard/calendar', icon: Calendar },
     { name: 'Create Post', href: '/dashboard/posts/new', icon: PenSquare },
-    { name: 'Unified Inbox', href: '/dashboard/inbox', icon: Inbox, badge: '3' },
+    { name: 'Unified Inbox', href: '/dashboard/inbox', icon: Inbox },
     { name: 'AI Studio', href: '/dashboard/ai-studio', icon: Sparkles },
     { name: 'Channels', href: '/dashboard/channels', icon: Share2 },
     { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
@@ -55,12 +68,14 @@ export function DashboardSidebar() {
         {/* Workspace Quick Card */}
         <div className="p-4 mx-3 my-3 rounded-xl bg-surface-2/60 border border-border/60">
           <div className="flex items-center justify-between text-xs text-foreground-muted mb-1">
-            <span className="font-medium text-foreground">Brew Haven Coffee</span>
+            <span className="font-medium text-foreground">{workspace?.name || 'Workspace'}</span>
             <span className="px-1.5 py-0.5 rounded text-[10px] bg-brand/20 text-brand font-semibold">
-              TRIAL
+              {workspace?.plan || 'PLAN'}
             </span>
           </div>
-          <p className="text-[11px] text-foreground-subtle">25 days remaining</p>
+          <p className="text-[11px] text-foreground-subtle">
+            {trialDays !== null ? `${trialDays} days remaining` : 'Workspace status'}
+          </p>
         </div>
 
         {/* Nav Links */}
@@ -88,11 +103,6 @@ export function DashboardSidebar() {
                   />
                   <span>{item.name}</span>
                 </div>
-                {item.badge && (
-                  <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-brand text-white">
-                    {item.badge}
-                  </span>
-                )}
               </Link>
             );
           })}
@@ -107,10 +117,10 @@ export function DashboardSidebar() {
             <span>NVIDIA NIM Engine</span>
           </div>
           <p className="text-[11px] text-foreground-muted leading-relaxed">
-            Connected to <strong>gpt-oss-20b</strong> & nemotron fallback.
+            AI model configuration is managed securely on the server.
           </p>
           <div className="mt-2.5 pt-2 border-t border-border/40 flex items-center justify-between text-[11px]">
-            <span className="text-foreground-subtle">Credits: 95 / 100</span>
+            <span className="text-foreground-subtle">Credits: {workspace?.aiCredits ?? 0}</span>
             <Link href="/dashboard/billing" className="text-brand hover:underline font-medium">
               Top Up
             </Link>

@@ -33,6 +33,9 @@ model Session {
   ipAddress    String?
   userAgent    String?
   createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model ApiKey {
@@ -80,6 +83,9 @@ model WorkspaceMember {
   user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   role          String    @default("EDITOR") // OWNER, ADMIN, EDITOR, VIEWER
   joinedAt      DateTime  @default(now())
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model BrandSettings {

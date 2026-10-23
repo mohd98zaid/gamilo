@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
-import { encryptToString } from '@/lib/encryption';
-import { channelSchema } from '@/lib/validators';
+import { store } from '@/features/testing/store';
+import { channelSchema } from '@/features/channels/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 
@@ -25,13 +24,21 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAuth();
+    const auth = await requireApiAuth('ADMIN');
     if (auth instanceof NextResponse) return auth;
     const body = await req.json();
     const parsed = channelSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
     }
+
+    if (auth) {
+      return NextResponse.json(
+        { error: 'Manual channel credentials are not accepted. Use a verified provider OAuth flow.' },
+        { status: 501 },
+      );
+    }
+
     const {
       platform,
       name,
@@ -69,12 +76,8 @@ export async function POST(req: Request) {
       platform,
       platformId: platformId || email || `pid_${Date.now()}`,
       name: channelName,
-      accessToken: encryptToString(storedAccessToken),
-      avatarUrl: isEmailProvider
-        ? platform === 'GMAIL'
-          ? 'https://images.unsplash.com/photo-1596526131083-e8c633c948d2?w=100'
-          : 'https://images.unsplash.com/photo-1557804506-669a67965ba0?w=100'
-        : parsed.data.avatarUrl || 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=100',
+      accessToken: storedAccessToken,
+      avatarUrl: parsed.data.avatarUrl,
       isActive: true,
       connectedAt: new Date().toISOString(),
       emailConfig: isEmailProvider
@@ -88,21 +91,6 @@ export async function POST(req: Request) {
           }
         : undefined,
     };
-
-    if (auth) {
-      const created = await prisma.channel.create({
-        data: {
-          workspaceId: auth.workspaceId,
-          platform,
-          platformId: newChannel.platformId,
-          name: newChannel.name,
-          accessToken: newChannel.accessToken,
-          avatarUrl: newChannel.avatarUrl,
-          isActive: true,
-        },
-      });
-      return NextResponse.json({ success: true, channel: publicChannel(created as unknown as Record<string, unknown>) }, { status: 201 });
-    }
 
     store.channels.push(newChannel as any);
 

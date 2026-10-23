@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
-import { settingsSchema } from '@/lib/validators';
+import { store } from '@/features/testing/store';
+import { settingsSchema } from '@/features/settings/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 
@@ -26,7 +26,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAuth();
+    const auth = await requireApiAuth('ADMIN');
     if (auth instanceof NextResponse) return auth;
     const parsed = settingsSchema.safeParse(await req.json());
     if (!parsed.success) {

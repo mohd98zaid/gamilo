@@ -21,7 +21,7 @@ import { DashboardTopbar } from '@/components/DashboardTopbar';
 export default function AiStudioPage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'caption' | 'email_subject' | 'outreach' | 'hashtags'>('caption');
-  const [prompt, setPrompt] = useState('Weekend pastry special: Cardamom brioche buns fresh from 8 AM');
+  const [prompt, setPrompt] = useState('');
   const [platform, setPlatform] = useState('instagram');
   const [result, setResult] = useState('');
   const [modelUsed, setModelUsed] = useState('');
@@ -49,8 +49,8 @@ export default function AiStudioPage() {
       const data = await res.json();
       if (data.text) {
         setResult(data.text);
-        setModelUsed(data.modelUsed || 'openai/gpt-oss-20b');
-        setDurationMs(data.durationMs || 450);
+        setModelUsed(data.modelUsed || 'Configured server model');
+        setDurationMs(data.durationMs || null);
       }
     } catch {
       alert('AI Generation request failed');
@@ -87,14 +87,14 @@ export default function AiStudioPage() {
               <div className="text-xs font-bold text-foreground flex items-center gap-2">
                 <span>NVIDIA NIM Engine</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/20 text-brand font-semibold">
-                  Primary: openai/gpt-oss-20b
+                  Primary model configured server-side
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-2 text-foreground-subtle border border-border font-semibold">
-                  Fallback: nemotron-3.5
+                  Fallback configured server-side
                 </span>
               </div>
               <p className="text-[11px] text-foreground-muted">
-                Max tokens: 2048 · Temperature: 0.1 · Reasoning output parser active.
+                 Generation limits and provider settings are configured server-side.
               </p>
             </div>
           </div>

@@ -9,7 +9,7 @@ const envSchema = z.object({
   TOKEN_ENCRYPTION_KEY: optionalSecret,
   NVIDIA_API_KEY: optionalSecret,
   NVIDIA_BASE_URL: z.string().url().default('https://integrate.api.nvidia.com/v1'),
-  NVIDIA_PRIMARY_MODEL: z.string().trim().min(1).default('openai/gpt-oss-20b'),
+  NVIDIA_PRIMARY_MODEL: z.string().trim().min(1),
   NVIDIA_FALLBACK_MODEL: z.string().trim().optional(),
   NVIDIA_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().max(8192).default(2048),
   NVIDIA_TEMPERATURE: z.coerce.number().min(0).max(2).default(0.1),
@@ -44,6 +44,10 @@ export function getRuntimeConfig(validateProductionSecrets = true): RuntimeConfi
 
 function validateProductionConfig(config: RuntimeConfig): void {
   if (config.NODE_ENV === 'production') {
+    if (!/^(postgresql|postgres):\/\//.test(config.DATABASE_URL)) {
+      throw new Error('DATABASE_URL must use PostgreSQL in production');
+    }
+
     const required: Array<keyof RuntimeConfig> = ['APP_SECRET', 'TOKEN_ENCRYPTION_KEY', 'NVIDIA_API_KEY'];
     const missing = required.filter((key) => !config[key]);
     if (missing.length > 0) {

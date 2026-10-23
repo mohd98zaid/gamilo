@@ -292,11 +292,13 @@ export default function ChannelsPage() {
                   className="p-5 rounded-2xl bg-surface border border-border flex items-center justify-between group hover:border-border/80 transition-all"
                 >
                   <div className="flex items-center gap-3.5">
-                    <img
-                      src={c.avatarUrl || 'https://images.unsplash.com/photo-1596526131083-e8c633c948d2?w=100'}
-                      alt={c.name}
-                      className="w-12 h-12 rounded-full object-cover border border-border"
-                    />
+                    {c.avatarUrl ? (
+                      <img src={c.avatarUrl} alt={c.name} className="w-12 h-12 rounded-full object-cover border border-border" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-surface-2 border border-border flex items-center justify-center text-xs font-bold text-foreground">
+                        {c.name?.slice(0, 2).toUpperCase() || 'CH'}
+                      </div>
+                    )}
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-sm text-foreground">{c.name}</span>
@@ -462,7 +464,7 @@ export default function ChannelsPage() {
                         <input
                           type="text"
                           required
-                          placeholder="Sarah Jenkins"
+                          placeholder="Account display name"
                           value={emailSenderName}
                           onChange={(e) => setEmailSenderName(e.target.value)}
                           className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"

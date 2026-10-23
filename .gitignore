@@ -1,21 +1,53 @@
+# Dependencies
 node_modules/
+
+# Next.js and build output
 .next/
+out/
+dist/
+.vercel/
+.turbo/
+
+# Test and coverage output
 coverage/
 playwright-report/
 test-results/
-*.log
+
+# Environment files and secrets
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.crt
+*.p12
+
+# Local databases and database journals
 *.db
 *.db-journal
-.DS_Store
-Thumbs.db
+*.sqlite
+*.sqlite3
 
-# Local editor and OS files
-.vscode/
-.idea/
-*.tsbuildinfo
+# Logs, caches, and process files
+*.log
+npm-debug.log*
+.cache/
+.eslintcache
 
 # Generated Prisma artifacts
 prisma/generated/
+
+# TypeScript and tool caches
+*.tsbuildinfo
+
+# IDE and editor files
+.vscode/
+.idea/
+.opencode/
+*.swp
+*.swo
+
+# Operating-system files
+.DS_Store
+Thumbs.db
+Desktop.ini

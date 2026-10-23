@@ -19,8 +19,10 @@ function CreatePostContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [caption, setCaption] = useState('');
-  const [selectedChannels, setSelectedChannels] = useState<string[]>(['ch_ig_1', 'ch_fb_1']);
-  const [mediaUrl, setMediaUrl] = useState('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=800');
+  const [channels, setChannels] = useState<any[]>([]);
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [workspaceName, setWorkspaceName] = useState('Workspace');
+  const [mediaUrl, setMediaUrl] = useState('');
   const [scheduledAt, setScheduledAt] = useState('');
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,6 +37,17 @@ function CreatePostContent() {
     const d = searchParams.get('date');
     if (d) setScheduledAt(`${d}T09:00`);
   }, [searchParams]);
+
+  React.useEffect(() => {
+    fetch('/api/channels')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setChannels(data?.channels || []))
+      .catch(() => setChannels([]));
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setWorkspaceName(data?.workspace?.name || 'Workspace'))
+      .catch(() => {});
+  }, []);
 
   function toggleChannel(id: string) {
     if (selectedChannels.includes(id)) {
@@ -71,7 +84,7 @@ function CreatePostContent() {
     }
   }
 
-  async function handlePublishOrSchedule(status: 'DRAFT' | 'SCHEDULED' | 'PUBLISHED') {
+  async function handleSaveOrSchedule(status: 'DRAFT' | 'SCHEDULED') {
     if (!caption.trim()) {
       alert('Please enter a caption');
       return;
@@ -112,7 +125,7 @@ function CreatePostContent() {
     <>
       <DashboardTopbar
         title="Create & Schedule Post"
-        subtitle="Publish to Instagram and Facebook with AI assistance"
+        subtitle="Create drafts and schedule posts for connected channels"
       />
 
       <main className="p-6 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -124,31 +137,23 @@ function CreatePostContent() {
               Publishing Targets
             </label>
             <div className="flex flex-wrap gap-3">
-              <button
-                type="button"
-                onClick={() => toggleChannel('ch_ig_1')}
-                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                  selectedChannels.includes('ch_ig_1')
-                    ? 'border-brand bg-brand/10 text-brand shadow-sm'
-                    : 'border-border bg-surface-2 text-foreground-muted'
-                }`}
-              >
-                <div className="w-2 h-2 rounded-full bg-pink-500" />
-                <span>Instagram (@brewhaven.coffee)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => toggleChannel('ch_fb_1')}
-                className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
-                  selectedChannels.includes('ch_fb_1')
-                    ? 'border-brand bg-brand/10 text-brand shadow-sm'
-                    : 'border-border bg-surface-2 text-foreground-muted'
-                }`}
-              >
-                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Facebook (Brew Haven Coffeehouse)</span>
-              </button>
+              {channels.length === 0 ? (
+                <span className="text-xs text-foreground-subtle">Connect a channel before creating a post.</span>
+              ) : channels.map((channel) => (
+                <button
+                  key={channel.id}
+                  type="button"
+                  onClick={() => toggleChannel(channel.id)}
+                  className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border text-xs font-semibold transition-all ${
+                    selectedChannels.includes(channel.id)
+                      ? 'border-brand bg-brand/10 text-brand shadow-sm'
+                      : 'border-border bg-surface-2 text-foreground-muted'
+                  }`}
+                >
+                  <div className="w-2 h-2 rounded-full bg-brand" />
+                  <span>{channel.platform}: {channel.name}</span>
+                </button>
+              ))}
             </div>
           </div>
 
@@ -219,17 +224,17 @@ function CreatePostContent() {
               <button
                 type="button"
                 disabled={isSubmitting}
-                onClick={() => handlePublishOrSchedule(scheduledAt ? 'SCHEDULED' : 'PUBLISHED')}
+                onClick={() => handleSaveOrSchedule(scheduledAt ? 'SCHEDULED' : 'DRAFT')}
                 className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white font-bold text-xs shadow-md shadow-brand/20 transition-all"
               >
                 <Send className="w-4 h-4" />
-                {scheduledAt ? 'Schedule Post' : 'Publish Immediately'}
+                {scheduledAt ? 'Schedule Post' : 'Save Draft'}
               </button>
 
               <button
                 type="button"
                 disabled={isSubmitting}
-                onClick={() => handlePublishOrSchedule('DRAFT')}
+                onClick={() => handleSaveOrSchedule('DRAFT')}
                 className="px-5 py-2.5 rounded-xl bg-surface-2 hover:bg-surface border border-border text-foreground font-semibold text-xs transition-colors"
               >
                 Save as Draft
@@ -248,14 +253,12 @@ function CreatePostContent() {
             {/* Header */}
             <div className="p-4 flex items-center justify-between border-b border-border/60">
               <div className="flex items-center gap-3">
-                <img
-                  src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=150"
-                  alt="Brew Haven"
-                  className="w-9 h-9 rounded-full object-cover border border-border"
-                />
+                <div className="w-9 h-9 rounded-full bg-surface-2 border border-border flex items-center justify-center text-xs font-bold text-foreground">
+                  {workspaceName.slice(0, 2).toUpperCase()}
+                </div>
                 <div>
-                  <div className="text-xs font-bold text-foreground">Brew Haven Coffee</div>
-                  <div className="text-[10px] text-foreground-subtle">Sponsored · Instagram / FB</div>
+                  <div className="text-xs font-bold text-foreground">{workspaceName}</div>
+                  <div className="text-[10px] text-foreground-subtle">Connected channels</div>
                 </div>
               </div>
             </div>
@@ -276,7 +279,7 @@ function CreatePostContent() {
             {/* Caption Preview */}
             <div className="p-4 space-y-2">
               <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
-                <strong className="text-brand">brewhaven.coffee</strong>{' '}
+                 <strong className="text-brand">{workspaceName}</strong>{' '}
                 {caption || 'Your drafted caption will appear here in real time...'}
               </p>
               <div className="text-[10px] text-foreground-subtle pt-2">
@@ -319,8 +322,8 @@ function CreatePostContent() {
                 </div>
 
                 <div className="p-3 rounded-xl bg-surface-2 text-xs text-foreground-muted space-y-1">
-                  <p><strong>Configured Model:</strong> <code>openai/gpt-oss-20b</code></p>
-                  <p><strong>Brand Context:</strong> Brew Haven Coffee (warm & friendly tone)</p>
+                   <p><strong>Configured Model:</strong> Server-side provider configuration</p>
+                   <p><strong>Brand Context:</strong> Workspace settings</p>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

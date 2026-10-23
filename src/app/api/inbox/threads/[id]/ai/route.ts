@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
+import { store } from '@/features/testing/store';
 import { AIPrompts } from '@/lib/ai/prompts';
 import { nvidiaNim } from '@/lib/ai/nvidia-nim';
 import { requireApiAuth } from '@/lib/api-auth';
@@ -9,7 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> | { id: string } }
 ) {
   const { id } = await params;
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('EDITOR');
   if (auth instanceof NextResponse) return auth;
   if (auth) return NextResponse.json({ error: 'Inbox AI suggestions require the persisted inbox adapter, which is not configured yet' }, { status: 501 });
   const thread = store.threads.find((t) => t.id === id);

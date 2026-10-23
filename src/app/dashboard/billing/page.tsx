@@ -48,9 +48,9 @@ export default function BillingPage() {
   }
 
   const sub = data?.subscription || {
-    plan: 'TRIAL',
-    daysRemaining: 25,
-    aiCredits: 95,
+    plan: 'UNAVAILABLE',
+    daysRemaining: 0,
+    aiCredits: 0,
   };
 
   return (
@@ -90,7 +90,7 @@ export default function BillingPage() {
               <span className="text-xs text-foreground-subtle">remaining</span>
             </div>
             <p className="text-xs text-foreground-subtle mt-2">
-              Powered by NVIDIA NIM (gpt-oss-20b)
+               AI provider configuration is managed server-side
             </p>
           </div>
 
@@ -98,10 +98,10 @@ export default function BillingPage() {
             <span className="text-xs font-semibold text-foreground-muted block mb-1">Payment Method</span>
             <div className="flex items-center gap-2 text-foreground font-bold text-sm mt-1">
               <CreditCard className="w-4 h-4 text-foreground-subtle" />
-              <span>Stripe Checkout Verified</span>
+               <span>Payment provider not configured</span>
             </div>
             <p className="text-xs text-foreground-subtle mt-2">
-              Secure billing through Stripe Billing Portal
+               Billing status will appear after a verified payment provider is connected.
             </p>
           </div>
         </div>

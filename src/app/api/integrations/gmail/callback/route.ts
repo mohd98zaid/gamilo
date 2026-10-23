@@ -8,7 +8,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  const auth = await requireApiAuth();
+  const auth = await requireApiAuth('ADMIN');
   if (auth instanceof NextResponse) return auth;
   if (!auth) return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
 

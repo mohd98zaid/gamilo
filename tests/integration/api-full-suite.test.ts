@@ -35,8 +35,8 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           platform: 'GMAIL',
-          name: 'Sarah (sarah@brewhaven.coffee)',
-          email: 'sarah@brewhaven.coffee',
+          name: 'Test Mail Account',
+          email: 'test@example.test',
           accessToken: 'abcd efgh ijkl mnop',
           authType: 'APP_PASSWORD',
           smtpHost: 'smtp.gmail.com',
@@ -90,7 +90,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           caption: 'Special Single Origin Geisha launch this Saturday!',
-          channelIds: ['ch_ig_1'],
+          channelIds: ['test-channel-instagram'],
           mediaUrls: ['https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb'],
           scheduledAt: new Date(Date.now() + 86400000).toISOString(),
           status: 'SCHEDULED',
@@ -129,16 +129,14 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       expect(data.post.caption).toContain('Limited to 50 bags!');
     });
 
-    it('publishes the post immediately', async () => {
+    it('does not claim publication before a provider is configured', async () => {
       const req = new Request(`http://localhost:3000/api/posts/${createdPostId}/publish`, {
         method: 'POST',
       });
       const res = await publishPost(req, { params: { id: createdPostId } });
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
       const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.post.status).toBe('PUBLISHED');
-      expect(data.post.metrics.impressions).toBeGreaterThanOrEqual(1);
+      expect(data.error).toContain('not configured');
     });
 
     it('deletes post from store', async () => {
@@ -164,16 +162,16 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
     });
 
     it('retrieves thread detail and marks conversation read', async () => {
-      const req = new Request('http://localhost:3000/api/inbox/threads/th_1');
-      const res = await getThread(req, { params: { id: 'th_1' } });
+      const req = new Request('http://localhost:3000/api/inbox/threads/test-thread-1');
+      const res = await getThread(req, { params: { id: 'test-thread-1' } });
       expect(res.status).toBe(200);
       const data = await res.json();
-      expect(data.thread.id).toBe('th_1');
+      expect(data.thread.id).toBe('test-thread-1');
       expect(data.thread.isRead).toBe(true);
     });
 
     it('sends an outbound reply to customer inquiry', async () => {
-      const req = new Request('http://localhost:3000/api/inbox/threads/th_1/reply', {
+      const req = new Request('http://localhost:3000/api/inbox/threads/test-thread-1/reply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -181,7 +179,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         }),
       });
 
-      const res = await postReply(req, { params: { id: 'th_1' } });
+      const res = await postReply(req, { params: { id: 'test-thread-1' } });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.success).toBe(true);
@@ -190,7 +188,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
     });
 
     it('updates thread labels / tags', async () => {
-      const req = new Request('http://localhost:3000/api/inbox/threads/th_1', {
+      const req = new Request('http://localhost:3000/api/inbox/threads/test-thread-1', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -198,7 +196,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         }),
       });
 
-      const res = await patchThread(req, { params: { id: 'th_1' } });
+      const res = await patchThread(req, { params: { id: 'test-thread-1' } });
       expect(res.status).toBe(200);
       const data = await res.json();
       expect(data.thread.labels).toContain('Resolved');
@@ -251,10 +249,10 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          businessName: 'Brew Haven Coffeehouse',
-          industry: 'Artisanal Roastery',
-          tone: 'warm, welcoming, and knowledgeable',
-          brandKnowledge: 'Store opens at 7am daily. Organic Colombian and Kenyan beans in stock.',
+          businessName: 'Test Workspace Updated',
+          industry: 'Test Industry Updated',
+          tone: 'professional and clear',
+          brandKnowledge: 'Test knowledge base.',
         }),
       });
 
@@ -264,8 +262,8 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       const getRes = await getSettings();
       expect(getRes.status).toBe(200);
       const data = await getRes.json();
-      expect(data.workspace.brandSettings.businessName).toBe('Brew Haven Coffeehouse');
-      expect(data.workspace.brandSettings.brandKnowledge).toContain('Organic Colombian');
+      expect(data.workspace.brandSettings.businessName).toBe('Test Workspace Updated');
+      expect(data.workspace.brandSettings.brandKnowledge).toContain('Test knowledge base');
     });
   });
 
@@ -322,7 +320,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       const req = new Request('http://localhost:3000/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: 'sarah@brewhaven.coffee', password: 'password123' }),
+        body: JSON.stringify({ email: 'test@example.test', password: 'password123' }),
       });
       const res = await postLogin(req);
       expect(res.status).toBe(200);

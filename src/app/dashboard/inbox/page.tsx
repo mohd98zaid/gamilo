@@ -20,7 +20,8 @@ import { formatDateTime } from '@/lib/utils';
 
 export default function InboxPage() {
   const [threads, setThreads] = useState<any[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string>('th_1');
+  const [activeThreadId, setActiveThreadId] = useState<string>('');
+  const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [replyText, setReplyText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [platformFilter, setPlatformFilter] = useState('ALL');
@@ -46,6 +47,13 @@ export default function InboxPage() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchThreads();
   }, [fetchThreads]);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setWorkspaceName(data?.workspace?.name || 'Workspace'))
+      .catch(() => {});
+  }, []);
 
   // Filter threads by search query & platform
   const filteredThreads = threads.filter((t) => {
@@ -144,7 +152,7 @@ export default function InboxPage() {
                 </span>
               </div>
               <p className="text-[11px] text-foreground-muted">
-                Model: <strong>openai/gpt-oss-20b</strong> with brand context knowledge protection.
+                 Provider model and brand context are configured securely on the server.
               </p>
             </div>
           </div>
@@ -256,14 +264,17 @@ export default function InboxPage() {
                 {/* Header */}
                 <div className="p-4 border-b border-border bg-surface flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={
-                        activeThread.contactAvatar ||
-                        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100'
-                      }
-                      alt={activeThread.contactName}
-                      className="w-9 h-9 rounded-full object-cover border border-border"
-                    />
+                    {activeThread.contactAvatar ? (
+                      <img
+                        src={activeThread.contactAvatar}
+                        alt={activeThread.contactName}
+                        className="w-9 h-9 rounded-full object-cover border border-border"
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-surface-2 border border-border flex items-center justify-center text-xs font-bold text-foreground">
+                        {activeThread.contactName.slice(0, 2).toUpperCase()}
+                      </div>
+                    )}
                     <div>
                       <h3 className="font-bold text-sm text-foreground">{activeThread.contactName}</h3>
                       <div className="text-[10px] text-foreground-subtle flex items-center gap-2">
@@ -341,7 +352,7 @@ export default function InboxPage() {
                 <div className="p-4 border-t border-border bg-surface space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-semibold text-foreground-muted">
-                      Reply as <strong>Brew Haven Coffee</strong>
+                      Reply as <strong>{workspaceName}</strong>
                     </span>
 
                     <button

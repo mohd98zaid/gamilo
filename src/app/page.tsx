@@ -24,7 +24,7 @@ import {
 import { Navbar } from '@/components/Navbar';
 
 export default function LandingPage() {
-  const [demoPrompt, setDemoPrompt] = useState('New cold brew espresso tonic launching this weekend');
+  const [demoPrompt, setDemoPrompt] = useState('');
   const [demoPlatform, setDemoPlatform] = useState('instagram');
   const [demoResult, setDemoResult] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,10 +49,10 @@ export default function LandingPage() {
       if (data.text) {
         setDemoResult(data.text);
       } else {
-        setDemoResult('Refreshing our roast! Come taste our newest release in-store this weekend.');
+        setDemoResult('The configured AI provider did not return content.');
       }
     } catch {
-      setDemoResult('Refreshing our roast! Come taste our newest release in-store this weekend. ☕✨ #SpecialtyCoffee #CraftRoast');
+      setDemoResult('AI generation is unavailable until an authenticated workspace and provider configuration are available.');
     } finally {
       setIsLoading(false);
     }
@@ -146,7 +146,7 @@ export default function LandingPage() {
             href="/dashboard"
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-brand hover:bg-brand-600 text-white font-bold text-base transition-all shadow-lg shadow-brand/25 hover:scale-[1.02] active:scale-[0.98]"
           >
-            Launch Live Demo
+             Start Free Trial
             <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
@@ -185,7 +185,7 @@ export default function LandingPage() {
             Test NVIDIA NIM In Real Time
           </h2>
           <p className="text-xs sm:text-sm text-foreground-muted mb-6">
-            Enter a topic below to invoke the live <code>gpt-oss-20b</code> primary model with fallback safety.
+             Sign in to an authenticated workspace to invoke the configured AI provider.
           </p>
 
           <form onSubmit={handleDemoGenerate} className="space-y-4">
@@ -231,7 +231,7 @@ export default function LandingPage() {
             <div className="mt-6 p-4 rounded-xl bg-surface-2/90 border border-brand/20 text-sm leading-relaxed text-foreground">
               <div className="text-[11px] font-semibold text-brand mb-1 flex items-center justify-between">
                 <span>NVIDIA NIM Output:</span>
-                <span className="text-foreground-subtle">Model: openai/gpt-oss-20b</span>
+                 <span className="text-foreground-subtle">Provider configuration is server-side</span>
               </div>
               <p className="whitespace-pre-wrap">{demoResult}</p>
             </div>

@@ -35,4 +35,9 @@ describe('AES-256-GCM Token Encryption Vault (8-Security.md)', () => {
 
     expect(() => decrypt(tampered)).toThrow();
   });
+
+  it('rejects plaintext and malformed encrypted values', () => {
+    expect(() => decryptFromString('plaintext-token')).toThrow();
+    expect(() => decryptFromString('enc:v1:bad')).toThrow();
+  });
 });

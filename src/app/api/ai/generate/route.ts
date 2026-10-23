@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { store } from '@/lib/db';
+import { store } from '@/features/testing/store';
 import { AIPrompts } from '@/lib/ai/prompts';
 import { nvidiaNim } from '@/lib/ai/nvidia-nim';
-import { aiGenerateSchema } from '@/lib/validators';
+import { aiGenerateSchema } from '@/features/ai/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
+import { isTestEnvironment } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
-    const auth = await requireApiAuth();
+    const auth = await requireApiAuth('EDITOR');
     if (auth instanceof NextResponse) return auth;
     const persistedWorkspace = auth ? await prisma.workspace.findUnique({ where: { id: auth.workspaceId }, include: { brandSettings: true } }) : null;
     if (auth && !persistedWorkspace) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
@@ -19,21 +20,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
     }
 
-    const availableCredits = persistedWorkspace?.aiCredits ?? store.workspace.aiCredits;
+    const availableCredits = auth ? persistedWorkspace?.aiCredits ?? 0 : store.workspace.aiCredits;
     if (availableCredits <= 0) {
       return NextResponse.json({ error: 'Insufficient AI credits' }, { status: 402 });
     }
 
     const { prompt, type, platform, brandContext } = parsed.data;
     const persistedBrand = persistedWorkspace?.brandSettings;
-    const brand = {
-      businessName: persistedBrand?.businessName ?? store.workspace.brandSettings.businessName,
-      industry: persistedBrand?.industry ?? store.workspace.brandSettings.industry,
-      tone: persistedBrand?.tone ?? store.workspace.brandSettings.tone,
-      description: persistedBrand?.description ?? store.workspace.brandSettings.description,
-      brandKnowledge: persistedBrand?.brandKnowledge ?? store.workspace.brandSettings.brandKnowledge,
-      ...brandContext,
-    };
+    const brand = auth
+      ? {
+          businessName: persistedBrand?.businessName ?? '',
+          industry: persistedBrand?.industry ?? '',
+          tone: persistedBrand?.tone ?? '',
+          description: persistedBrand?.description ?? '',
+          brandKnowledge: persistedBrand?.brandKnowledge ?? '',
+          ...brandContext,
+        }
+      : {
+          ...store.workspace.brandSettings,
+          ...brandContext,
+        };
 
     let system = '';
     let user = '';
@@ -77,6 +83,10 @@ export async function POST(req: Request) {
         await prisma.workspace.update({ where: { id: auth.workspaceId }, data: { aiCredits: { increment: 1 } } });
         throw error;
       }
+    }
+
+    if (!isTestEnvironment()) {
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 });
     }
 
     const aiResult = await nvidiaNim.generate({ systemPrompt: system, userPrompt: user });

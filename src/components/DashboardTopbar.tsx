@@ -1,10 +1,22 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Sparkles, Bell, Plus, Search, ShieldCheck } from 'lucide-react';
 
 export function DashboardTopbar({ title, subtitle }: { title?: string; subtitle?: string }) {
+  const [user, setUser] = useState<{ name?: string | null; email?: string } | null>(null);
+
+  useEffect(() => {
+    fetch('/api/auth/session')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setUser(data?.user ?? null))
+      .catch(() => setUser(null));
+  }, []);
+
+  const displayName = user?.name || user?.email || 'Account';
+  const initials = displayName.slice(0, 2).toUpperCase();
+
   return (
     <header className="h-16 border-b border-border bg-surface/50 backdrop-blur-md px-6 flex items-center justify-between sticky top-0 z-40">
       <div>
@@ -40,14 +52,12 @@ export function DashboardTopbar({ title, subtitle }: { title?: string; subtitle?
 
         {/* User Avatar */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-border">
-          <img
-            src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100"
-            alt="Sarah Jenkins"
-            className="w-8 h-8 rounded-full border border-border object-cover"
-          />
+          <div className="w-8 h-8 rounded-full border border-border bg-surface-2 flex items-center justify-center text-[10px] font-bold text-foreground">
+            {initials}
+          </div>
           <div className="hidden lg:block text-left">
-            <span className="text-xs font-semibold text-foreground block leading-tight">Sarah J.</span>
-            <span className="text-[10px] text-foreground-subtle block">Owner</span>
+            <span className="text-xs font-semibold text-foreground block leading-tight">{displayName}</span>
+            <span className="text-[10px] text-foreground-subtle block">Workspace member</span>
           </div>
         </div>
       </div>

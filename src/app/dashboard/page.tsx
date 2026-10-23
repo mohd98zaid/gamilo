@@ -22,6 +22,7 @@ import { formatDateTime } from '@/lib/utils';
 export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [workspaceName, setWorkspaceName] = useState('Workspace');
 
   useEffect(() => {
     fetch('/api/analytics/overview')
@@ -31,17 +32,22 @@ export default function DashboardPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch('/api/settings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((d) => setWorkspaceName(d?.workspace?.name || 'Workspace'))
+      .catch(() => {});
   }, []);
 
   const metrics = data?.metrics || {
-    totalImpressions: 1420,
-    totalReach: 1180,
-    totalEngagement: 225,
-    engagementRate: '19.1%',
-    scheduledCount: 1,
-    activeChannelsCount: 2,
-    unreadInboxCount: 1,
+    totalImpressions: 0,
+    totalReach: 0,
+    totalEngagement: 0,
+    engagementRate: '0.0%',
+    scheduledCount: 0,
+    activeChannelsCount: 0,
+    unreadInboxCount: 0,
   };
+  const recentPosts = data?.recentPosts || [];
 
   return (
     <>
@@ -55,13 +61,13 @@ export default function DashboardPage() {
         <div className="rounded-3xl p-6 bg-gradient-to-r from-surface to-surface-2 border border-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xl font-bold text-foreground">Brew Haven Coffee</span>
+               <span className="text-xl font-bold text-foreground">{workspaceName}</span>
               <span className="text-xs px-2 py-0.5 rounded-full bg-brand/10 text-brand font-semibold border border-brand/20">
-                Active Trial
+                 Workspace
               </span>
             </div>
             <p className="text-xs text-foreground-muted">
-              2 channels connected: <strong>@brewhaven.coffee</strong> & Facebook Page. AI replies enabled.
+               {metrics.activeChannelsCount} connected channel{metrics.activeChannelsCount === 1 ? '' : 's'}.
             </p>
           </div>
 
@@ -92,7 +98,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.totalReach.toLocaleString()}</div>
             <div className="text-[11px] text-brand font-medium mt-1 flex items-center gap-1">
-              <TrendingUp className="w-3 h-3" /> +14.2% vs last week
+               <TrendingUp className="w-3 h-3" /> Derived from persisted analytics
             </div>
           </div>
 
@@ -114,7 +120,7 @@ export default function DashboardPage() {
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.scheduledCount}</div>
             <div className="text-[11px] text-foreground-subtle mt-1">
-              Next post in <span className="text-foreground font-medium">18 hours</span>
+               Scheduled content in your workspace
             </div>
           </div>
 
@@ -124,7 +130,7 @@ export default function DashboardPage() {
               <Share2 className="w-4 h-4 text-purple-400" />
             </div>
             <div className="text-2xl font-extrabold text-foreground">{metrics.activeChannelsCount}</div>
-            <div className="text-[11px] text-brand mt-1 font-medium">IG + Facebook healthy</div>
+            <div className="text-[11px] text-brand mt-1 font-medium">Provider status is shown per channel</div>
           </div>
         </div>
 
@@ -143,44 +149,19 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              {/* Scheduled post preview */}
-              <div className="p-4 rounded-xl bg-surface-2/60 border border-border flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                      SCHEDULED
-                    </span>
-                    <span className="text-xs text-foreground-subtle flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Tomorrow at 8:00 AM
-                    </span>
+              {recentPosts.length === 0 ? (
+                <div className="p-6 rounded-xl bg-surface-2/40 border border-border text-xs text-foreground-subtle">
+                  No persisted posts yet. Create your first post to populate this schedule.
+                </div>
+              ) : recentPosts.slice(0, 2).map((post: any) => (
+                <div key={post.id} className="p-4 rounded-xl bg-surface-2/60 border border-border flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand/10 text-brand border border-brand/20">{post.status}</span>
+                    <p className="text-xs text-foreground leading-relaxed line-clamp-2">{post.caption}</p>
                   </div>
-                  <p className="text-xs text-foreground leading-relaxed line-clamp-2">
-                    Weekend pastry preview: Cinnamon cardamom brioche knots fresh from the oven tomorrow at 8 AM. Save this post! 🥐✨
-                  </p>
+                  <span className="text-[11px] text-foreground-subtle font-medium bg-surface px-2 py-1 rounded border border-border shrink-0">Post</span>
                 </div>
-                <span className="text-[11px] text-foreground-subtle font-medium bg-surface px-2 py-1 rounded border border-border shrink-0">
-                  Instagram
-                </span>
-              </div>
-
-              {/* Published post preview */}
-              <div className="p-4 rounded-xl bg-surface-2/40 border border-border/80 flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-brand/10 text-brand border border-brand/20">
-                      PUBLISHED
-                    </span>
-                    <span className="text-xs text-foreground-subtle">Yesterday</span>
-                  </div>
-                  <p className="text-xs text-foreground leading-relaxed line-clamp-2">
-                    Fresh batch of Ethiopian Yirgacheffe roasted this morning! ☕ Notes of jasmine, bergamot, and sweet peach...
-                  </p>
-                </div>
-                <div className="text-right text-[11px] text-foreground-subtle shrink-0">
-                  <div className="font-semibold text-foreground">184 likes · 29 comments</div>
-                  <span>IG & FB</span>
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
@@ -195,36 +176,8 @@ export default function DashboardPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-brand animate-ping" />
               </div>
 
-              <div className="space-y-3">
-                <div className="p-3 rounded-xl bg-surface-2/80 border border-brand/20">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-bold text-foreground">sarah_adventures</span>
-                    <span className="text-[10px] text-brand font-semibold">15m ago</span>
-                  </div>
-                  <p className="text-xs text-foreground-muted line-clamp-2">
-                    &quot;Do you have any gluten-free pastries tomorrow? Also extra charge for oat milk?&quot;
-                  </p>
-                  <div className="mt-2 flex items-center justify-between">
-                    <span className="text-[10px] text-foreground-subtle font-medium">Instagram DM</span>
-                    <Link
-                      href="/dashboard/inbox"
-                      className="text-[11px] font-bold text-brand hover:underline flex items-center gap-1"
-                    >
-                      <Sparkles className="w-3 h-3" /> Draft AI Reply
-                    </Link>
-                  </div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-surface-2/40 border border-border">
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="font-bold text-foreground">David Miller</span>
-                    <span className="text-[10px] text-foreground-subtle">2h ago</span>
-                  </div>
-                  <p className="text-xs text-foreground-muted line-clamp-1">
-                    &quot;Looking to host a team coffee workshop for 12 people...&quot;
-                  </p>
-                  <span className="text-[10px] text-foreground-subtle font-medium mt-1 block">Facebook Inquiry</span>
-                </div>
+              <div className="p-6 rounded-xl bg-surface-2/40 border border-border text-xs text-foreground-subtle">
+                {metrics.unreadInboxCount > 0 ? `${metrics.unreadInboxCount} unread conversation${metrics.unreadInboxCount === 1 ? '' : 's'} available.` : 'No unread conversations.'}
               </div>
             </div>
 

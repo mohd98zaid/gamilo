@@ -58,20 +58,25 @@ export async function getCurrentUser() {
     include: {
       user: {
         include: {
-          workspaces: { include: { workspace: { include: { brandSettings: true } } }, take: 1 },
+          workspaces: { include: { workspace: { include: { brandSettings: true } } }, orderBy: { joinedAt: 'asc' }, take: 1 },
         },
       },
     },
   });
 
   if (!session || session.expiresAt <= new Date()) {
-    if (session) await prisma.session.delete({ where: { id: session.id } });
+    if (session) await prisma.session.deleteMany({ where: { id: session.id } });
     await clearSessionCookie();
     return null;
   }
 
   const membership = session.user.workspaces[0];
-  if (!membership) return null;
+  const role = membership?.role.toUpperCase();
+  if (!membership || !role || !['VIEWER', 'EDITOR', 'ADMIN', 'OWNER'].includes(role)) {
+    await prisma.session.deleteMany({ where: { id: session.id } });
+    await clearSessionCookie();
+    return null;
+  }
 
   return {
     id: session.user.id,
@@ -79,11 +84,14 @@ export async function getCurrentUser() {
     name: session.user.name,
     avatarUrl: session.user.avatarUrl,
     workspaceId: membership.workspaceId,
-    role: membership.role,
+    role,
     workspace: membership.workspace,
   };
 }
 
 export function isTestEnvironment(): boolean {
-  return getRuntimeConfig().NODE_ENV === 'test';
+  // Test fixtures must be explicitly enabled. NODE_ENV alone is not a safe
+  // authorization signal because route handlers use this helper to select the
+  // in-memory fixture path.
+  return process.env.NODE_ENV === 'test' && process.env.GMAILO_TEST_AUTH_BYPASS === 'true';
 }

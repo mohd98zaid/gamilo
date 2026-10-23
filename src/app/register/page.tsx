@@ -58,7 +58,7 @@ export default function RegisterPage() {
               <User className="w-4 h-4 text-foreground-subtle absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Sarah Jenkins"
+                placeholder="Your name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
@@ -73,7 +73,7 @@ export default function RegisterPage() {
               <Building className="w-4 h-4 text-foreground-subtle absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Brew Haven Coffee"
+                placeholder="Your workspace name"
                 value={workspaceName}
                 onChange={(e) => setWorkspaceName(e.target.value)}
                 required
@@ -88,7 +88,7 @@ export default function RegisterPage() {
               <Mail className="w-4 h-4 text-foreground-subtle absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="email"
-                placeholder="sarah@brewhaven.coffee"
+                placeholder="you@company.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
