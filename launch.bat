@@ -49,10 +49,14 @@ if not exist "node_modules\.bin\next.cmd" (
 echo [INFO] Preparing Prisma client and local SQLite database...
 call npm run db:generate
 if errorlevel 1 (
-    echo [ERROR] Prisma client generation failed.
-    pause
-    popd
-    exit /b 1
+    if exist "node_modules\.prisma\client\index.js" (
+        echo [INFO] Existing Prisma client detected, continuing...
+    ) else (
+        echo [ERROR] Prisma client generation failed.
+        pause
+        popd
+        exit /b 1
+    )
 )
 
 call npm run db:push
