@@ -39,6 +39,7 @@ prisma/generated/
 
 # TypeScript and tool caches
 *.tsbuildinfo
+AGENTS.md
 
 # IDE and editor files
 .vscode/
