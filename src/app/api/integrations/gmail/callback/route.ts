@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { requireApiAuth } from '@/lib/api-auth';
-import { getRuntimeConfig, requireConfigured } from '@/lib/config';
+import { getRuntimeConfig } from '@/lib/config';
 import { encryptToString } from '@/lib/encryption';
 import { prisma } from '@/lib/prisma';
 
@@ -21,9 +21,13 @@ export async function GET(req: Request) {
   }
 
   const config = getRuntimeConfig();
-  const clientId = requireConfigured(config.GOOGLE_CLIENT_ID, 'GOOGLE_CLIENT_ID');
-  const clientSecret = requireConfigured(config.GOOGLE_CLIENT_SECRET, 'GOOGLE_CLIENT_SECRET');
-  const redirectUri = requireConfigured(config.GOOGLE_REDIRECT_URI, 'GOOGLE_REDIRECT_URI');
+  const clientId = config.GOOGLE_CLIENT_ID;
+  const clientSecret = config.GOOGLE_CLIENT_SECRET;
+  const redirectUri = config.GOOGLE_REDIRECT_URI;
+
+  if (!clientId || !clientSecret || !redirectUri || clientId === 'replace_me') {
+    return NextResponse.redirect(new URL('/dashboard/channels?error=google_oauth_not_configured', req.url));
+  }
 
   const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

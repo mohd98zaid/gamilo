@@ -29,6 +29,8 @@ export default function ChannelsPage() {
   const [accountName, setAccountName] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
+  const [oauthError, setOauthError] = useState<string | null>(null);
+  const [oauthSuccess, setOauthSuccess] = useState<string | null>(null);
 
   // Email-specific state
   const [emailAddress, setEmailAddress] = useState('');
@@ -43,6 +45,19 @@ export default function ChannelsPage() {
 
   useEffect(() => {
     fetchChannels();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('error') === 'google_oauth_not_configured') {
+        setOauthError(
+          'Google Cloud OAuth is not configured in your .env file (missing GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI). You can connect your Gmail account instantly using your 16-character Google App Password below!'
+        );
+      } else if (params.get('error')) {
+        setOauthError(`Google connection error: ${params.get('error')}`);
+      }
+      if (params.get('connected') === 'gmail') {
+        setOauthSuccess('Gmail account connected successfully via Google OAuth!');
+      }
+    }
   }, []);
 
   async function fetchChannels() {
@@ -88,10 +103,6 @@ export default function ChannelsPage() {
 
     try {
       const isEmail = selectedPlatform === 'GMAIL' || selectedPlatform === 'EMAIL';
-      if (selectedPlatform === 'GMAIL') {
-        router.push('/api/integrations/gmail/start');
-        return;
-      }
       const payload: any = {
         platform: selectedPlatform,
         name: isEmail ? (emailSenderName ? `${emailSenderName} (${emailAddress})` : emailAddress) : accountName,
@@ -204,6 +215,44 @@ export default function ChannelsPage() {
       />
 
       <main className="p-6 max-w-7xl mx-auto w-full space-y-8">
+        {oauthError && (
+          <div className="rounded-2xl bg-amber-500/10 border border-amber-500/20 p-4 text-xs text-amber-200 flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <strong className="block font-bold text-amber-300">Google OAuth Not Configured</strong>
+                <p className="mt-0.5 text-amber-200/90 leading-relaxed">{oauthError}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => {
+                setOauthError(null);
+                setSelectedPlatform('GMAIL');
+                handlePresetChange('GMAIL');
+                setIsModalOpen(true);
+              }}
+              className="shrink-0 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold border border-amber-500/30 transition-colors"
+            >
+              Connect with App Password
+            </button>
+          </div>
+        )}
+
+        {oauthSuccess && (
+          <div className="rounded-2xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-xs text-emerald-200 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{oauthSuccess}</span>
+            </div>
+            <button
+              onClick={() => setOauthSuccess(null)}
+              className="text-emerald-400 hover:text-emerald-200 text-xs"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* Help & Setup Guide Banner */}
         <div className="rounded-3xl bg-gradient-to-r from-surface to-surface-2 border border-border p-5 space-y-3">
           <div className="flex items-center justify-between">
@@ -554,6 +603,19 @@ export default function ChannelsPage() {
                     {isConnecting ? 'Verifying & Saving...' : 'Authorize & Connect'}
                   </button>
                 </div>
+
+                {selectedPlatform === 'GMAIL' && (
+                  <div className="text-center pt-1 border-t border-border/50 text-[11px] text-foreground-subtle">
+                    Prefer Google Cloud OAuth?{' '}
+                    <a
+                      href="/api/integrations/gmail/start"
+                      className="text-brand hover:underline font-semibold"
+                    >
+                      Sign in with Google OAuth
+                    </a>{' '}
+                    (requires GOOGLE_CLIENT_ID in .env)
+                  </div>
+                )}
               </form>
             </div>
           </div>

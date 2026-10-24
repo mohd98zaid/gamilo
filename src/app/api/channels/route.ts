@@ -3,6 +3,7 @@ import { store } from '@/features/testing/store';
 import { channelSchema } from '@/features/channels/schemas';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
+import { encryptToString } from '@/lib/encryption';
 
 function publicChannel(channel: Record<string, unknown>) {
   const { accessToken: _accessToken, refreshToken: _refreshToken, ...safeChannel } = channel;
@@ -14,7 +15,17 @@ export async function GET() {
   if (auth instanceof NextResponse) return auth;
   if (auth) {
     const channels = await prisma.channel.findMany({ where: { workspaceId: auth.workspaceId, isActive: true }, orderBy: { createdAt: 'desc' } });
-    return NextResponse.json({ channels: channels.map((channel) => publicChannel(channel as unknown as Record<string, unknown>)), total: channels.length });
+    return NextResponse.json({
+      channels: channels.map((channel) => {
+        const safe = publicChannel(channel as unknown as Record<string, unknown>);
+        const isEmailProvider = channel.platform === 'GMAIL' || channel.platform === 'EMAIL';
+        return {
+          ...safe,
+          emailConfig: isEmailProvider ? { email: channel.platformId } : undefined,
+        };
+      }),
+      total: channels.length,
+    });
   }
   return NextResponse.json({
     channels: store.channels.map((channel) => publicChannel(channel as unknown as Record<string, unknown>)),
@@ -30,13 +41,6 @@ export async function POST(req: Request) {
     const parsed = channelSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
-    }
-
-    if (auth) {
-      return NextResponse.json(
-        { error: 'Manual channel credentials are not accepted. Use a verified provider OAuth flow.' },
-        { status: 501 },
-      );
     }
 
     const {
@@ -72,7 +76,7 @@ export async function POST(req: Request) {
 
     const newChannel = {
       id: `ch_${Date.now()}`,
-      workspaceId: store.workspace.id,
+      workspaceId: auth?.workspaceId || store.workspace.id,
       platform,
       platformId: platformId || email || `pid_${Date.now()}`,
       name: channelName,
@@ -91,6 +95,30 @@ export async function POST(req: Request) {
           }
         : undefined,
     };
+
+    if (auth) {
+      const created = await prisma.channel.create({
+        data: {
+          workspaceId: auth.workspaceId,
+          platform,
+          platformId: newChannel.platformId,
+          name: newChannel.name,
+          accessToken: encryptToString(storedAccessToken),
+          avatarUrl: newChannel.avatarUrl,
+          isActive: true,
+        },
+      });
+      return NextResponse.json(
+        {
+          success: true,
+          channel: {
+            ...publicChannel(created as unknown as Record<string, unknown>),
+            emailConfig: newChannel.emailConfig,
+          },
+        },
+        { status: 201 },
+      );
+    }
 
     store.channels.push(newChannel as any);
 
