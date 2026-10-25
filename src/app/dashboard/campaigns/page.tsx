@@ -18,6 +18,7 @@ import {
   Pencil,
   Shuffle,
   ShieldCheck,
+  Search,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 import { inferContactDetails } from '@/lib/email/contact-infer';
@@ -42,6 +43,7 @@ interface Recipient {
   company?: string | null;
   status: string;
   sentAt?: string | null;
+  errorMessage?: string | null;
 }
 
 export default function CampaignsPage() {
@@ -66,6 +68,8 @@ export default function CampaignsPage() {
   const [rawContactsText, setRawContactsText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [isEnrichingAi, setIsEnrichingAi] = useState(false);
+  const [recipientFilter, setRecipientFilter] = useState<'ALL' | 'SENT' | 'PENDING' | 'FAILED'>('ALL');
+  const [recipientSearch, setRecipientSearch] = useState('');
 
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
@@ -225,6 +229,8 @@ export default function CampaignsPage() {
   async function handleOpenRecipients(camp: Campaign) {
     setActiveCampaign(camp);
     setIsRecipientsOpen(true);
+    setRecipientFilter('ALL');
+    setRecipientSearch('');
     try {
       const res = await fetch(`/api/campaigns/${camp.id}`);
       if (res.ok) {
@@ -404,6 +410,22 @@ export default function CampaignsPage() {
 
   const totalSentAll = campaigns.reduce((acc, c) => acc + c.totalSent, 0);
   const totalRecipientsAll = campaigns.reduce((acc, c) => acc + c.totalRecipients, 0);
+
+  const countSent = recipients.filter((r) => r.status === 'SENT').length;
+  const countPending = recipients.filter((r) => r.status === 'PENDING').length;
+  const countFailed = recipients.filter((r) => r.status === 'FAILED').length;
+
+  const filteredRecipients = recipients.filter((r) => {
+    if (recipientFilter !== 'ALL' && r.status !== recipientFilter) return false;
+    if (recipientSearch.trim()) {
+      const q = recipientSearch.toLowerCase();
+      const matchEmail = r.email.toLowerCase().includes(q);
+      const matchName = (r.name || '').toLowerCase().includes(q);
+      const matchCompany = (r.company || '').toLowerCase().includes(q);
+      if (!matchEmail && !matchName && !matchCompany) return false;
+    }
+    return true;
+  });
 
   return (
     <>
@@ -848,8 +870,76 @@ export default function CampaignsPage() {
                   </p>
                 </div>
 
+                {/* Filter Tabs & Search Bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+                  {/* Status Filter Tabs */}
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2/80 border border-border text-xs overflow-x-auto">
+                    <button
+                      type="button"
+                      onClick={() => setRecipientFilter('ALL')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                        recipientFilter === 'ALL'
+                          ? 'bg-brand text-white shadow-sm'
+                          : 'text-foreground-muted hover:text-foreground'
+                      }`}
+                    >
+                      All ({recipients.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientFilter('SENT')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        recipientFilter === 'SENT'
+                          ? 'bg-emerald-500 text-white shadow-sm'
+                          : 'text-emerald-400 hover:bg-emerald-500/10'
+                      }`}
+                    >
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Sent ({countSent})</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecipientFilter('PENDING')}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                        recipientFilter === 'PENDING'
+                          ? 'bg-blue-500 text-white shadow-sm'
+                          : 'text-foreground-muted hover:bg-surface'
+                      }`}
+                    >
+                      <Clock className="w-3 h-3" />
+                      <span>Pending ({countPending})</span>
+                    </button>
+                    {countFailed > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setRecipientFilter('FAILED')}
+                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                          recipientFilter === 'FAILED'
+                            ? 'bg-red-500 text-white shadow-sm'
+                            : 'text-red-400 hover:bg-red-500/10'
+                        }`}
+                      >
+                        <AlertCircle className="w-3 h-3" />
+                        <span>Failed ({countFailed})</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Search Bar */}
+                  <div className="relative flex-1 sm:max-w-xs">
+                    <Search className="w-3.5 h-3.5 text-foreground-subtle absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Search email, name or company..."
+                      value={recipientSearch}
+                      onChange={(e) => setRecipientSearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                </div>
+
                 {/* Recipients Table */}
-                <div className="max-h-60 overflow-y-auto border border-border rounded-xl">
+                <div className="max-h-64 overflow-y-auto border border-border rounded-xl">
                   <table className="w-full text-left text-xs text-foreground">
                     <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0">
                       <tr>
@@ -857,17 +947,20 @@ export default function CampaignsPage() {
                         <th className="p-2.5">Name</th>
                         <th className="p-2.5">Company</th>
                         <th className="p-2.5">Status</th>
+                        <th className="p-2.5">Logs / Sent Time</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
-                      {recipients.length === 0 ? (
+                      {filteredRecipients.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="p-4 text-center text-foreground-subtle text-xs">
-                            No recipients added yet. Paste a list above to populate.
+                          <td colSpan={5} className="p-6 text-center text-foreground-subtle text-xs">
+                            {recipients.length === 0
+                              ? 'No recipients added yet. Paste a list above to populate.'
+                              : 'No recipients match the selected filter or search.'}
                           </td>
                         </tr>
                       ) : (
-                        recipients.map((r) => (
+                        filteredRecipients.map((r) => (
                           <tr key={r.id} className="hover:bg-surface-2/40">
                             <td className="p-2.5 font-mono">{r.email}</td>
                             <td className="p-2.5">{r.name || '—'}</td>
@@ -876,14 +969,33 @@ export default function CampaignsPage() {
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
                                   r.status === 'SENT'
-                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                     : r.status === 'FAILED'
-                                    ? 'bg-red-500/10 text-red-400'
-                                    : 'bg-surface-2 text-foreground-subtle'
+                                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                    : 'bg-surface-2 text-foreground-subtle border border-border'
                                 }`}
                               >
                                 {r.status}
                               </span>
+                            </td>
+                            <td className="p-2.5 text-[11px]">
+                              {r.status === 'SENT' && (
+                                <span className="text-emerald-400 flex items-center gap-1 font-mono">
+                                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                  <span>{r.sentAt ? new Date(r.sentAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Dispatched'}</span>
+                                </span>
+                              )}
+                              {r.status === 'FAILED' && (
+                                <span className="text-red-400 font-semibold" title={r.errorMessage || 'Send Failed'}>
+                                  ⚠ {r.errorMessage || 'Send Failed'}
+                                </span>
+                              )}
+                              {r.status === 'PENDING' && (
+                                <span className="text-foreground-subtle flex items-center gap-1">
+                                  <Clock className="w-3 h-3 shrink-0" />
+                                  <span>Queued for dispatch</span>
+                                </span>
+                              )}
                             </td>
                           </tr>
                         ))
