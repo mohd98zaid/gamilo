@@ -14,10 +14,20 @@ export async function POST(
   const workspaceId = auth?.workspaceId ?? 'default-workspace';
 
   try {
+    let recipientId: string | undefined;
+    try {
+      const body = await req.json();
+      recipientId = body?.recipientId;
+    } catch {
+      // empty body, full campaign dispatch
+    }
+
     const campaign = await prisma.campaign.findFirst({
       where: { id, workspaceId },
       include: {
-        recipients: { where: { status: 'PENDING' } },
+        recipients: recipientId
+          ? { where: { id: recipientId } }
+          : { where: { status: 'PENDING' } },
       },
     });
 
@@ -34,19 +44,23 @@ export async function POST(
 
     if (campaign.recipients.length === 0) {
       return NextResponse.json(
-        { error: 'No pending recipients found in this campaign' },
+        { error: recipientId ? 'Recipient not found in this campaign' : 'No pending recipients found in this campaign' },
         { status: 400 }
       );
     }
 
-    // Mark as SENDING
-    await prisma.campaign.update({
-      where: { id },
-      data: {
-        status: 'SENDING',
-        startedAt: new Date(),
-      },
-    });
+    const wasFailed = recipientId ? campaign.recipients[0]?.status === 'FAILED' : false;
+
+    // Mark as SENDING for full campaign run
+    if (!recipientId) {
+      await prisma.campaign.update({
+        where: { id },
+        data: {
+          status: 'SENDING',
+          startedAt: new Date(),
+        },
+      });
+    }
 
     const dispatchResult = await sendBulkEmails({
       workspaceId,
@@ -74,16 +88,30 @@ export async function POST(
       });
     }
 
-    // Mark campaign as COMPLETED
-    const updated = await prisma.campaign.update({
-      where: { id },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        totalSent: { increment: dispatchResult.sent },
-        totalFailed: { increment: dispatchResult.failed },
-      },
-    });
+    // Update campaign counters
+    const updateData: any = {};
+    if (recipientId) {
+      if (dispatchResult.sent > 0) {
+        updateData.totalSent = { increment: 1 };
+        if (wasFailed && campaign.totalFailed > 0) {
+          updateData.totalFailed = { decrement: 1 };
+        }
+      } else if (dispatchResult.failed > 0 && !wasFailed) {
+        updateData.totalFailed = { increment: 1 };
+      }
+    } else {
+      updateData.status = 'COMPLETED';
+      updateData.completedAt = new Date();
+      updateData.totalSent = { increment: dispatchResult.sent };
+      updateData.totalFailed = { increment: dispatchResult.failed };
+    }
+
+    const updated = Object.keys(updateData).length > 0
+      ? await prisma.campaign.update({
+          where: { id },
+          data: updateData,
+        })
+      : campaign;
 
     return NextResponse.json({
       success: true,
@@ -91,6 +119,7 @@ export async function POST(
       failed: dispatchResult.failed,
       total: dispatchResult.total,
       campaign: updated,
+      result: dispatchResult.results[0],
     });
   } catch (error) {
     console.error('Campaign sending failed', error);

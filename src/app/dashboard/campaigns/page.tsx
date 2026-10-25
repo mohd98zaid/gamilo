@@ -74,6 +74,7 @@ export default function CampaignsPage() {
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
   const [isRetryingFailed, setIsRetryingFailed] = useState<string | null>(null);
+  const [isRetryingSingle, setIsRetryingSingle] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
 
   function handleOpenCreate() {
@@ -381,6 +382,29 @@ export default function CampaignsPage() {
       alert('Error resetting failed recipients');
     } finally {
       setIsRetryingFailed(null);
+    }
+  }
+
+  async function handleRetrySingleRecipient(recipientId: string) {
+    if (!activeCampaign) return;
+    setIsRetryingSingle(recipientId);
+    try {
+      const res = await fetch(`/api/campaigns/${activeCampaign.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipientId }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        await handleOpenRecipients(activeCampaign);
+        await loadData();
+      } else {
+        alert(d.error || 'Failed to dispatch email');
+      }
+    } catch {
+      alert('Network error while dispatching email');
+    } finally {
+      setIsRetryingSingle(null);
     }
   }
 
@@ -987,20 +1011,21 @@ export default function CampaignsPage() {
 
                 {/* Recipients Table */}
                 <div className="max-h-72 overflow-x-auto overflow-y-auto border border-border rounded-xl">
-                  <table className="min-w-[680px] w-full text-left text-xs text-foreground">
+                  <table className="min-w-[760px] w-full text-left text-xs text-foreground">
                     <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0 z-10">
                       <tr>
                         <th className="p-3 w-[220px]">Email</th>
-                        <th className="p-3 w-[140px]">Name</th>
-                        <th className="p-3 w-[140px]">Company</th>
-                        <th className="p-3 w-[90px]">Status</th>
-                        <th className="p-3 min-w-[170px] whitespace-nowrap">Logs / Sent Time</th>
+                        <th className="p-3 w-[130px]">Name</th>
+                        <th className="p-3 w-[130px]">Company</th>
+                        <th className="p-3 w-[80px]">Status</th>
+                        <th className="p-3 min-w-[150px] whitespace-nowrap">Logs / Sent Time</th>
+                        <th className="p-3 w-[90px] text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
                       {filteredRecipients.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="p-6 text-center text-foreground-subtle text-xs">
+                          <td colSpan={6} className="p-6 text-center text-foreground-subtle text-xs">
                             {recipients.length === 0
                               ? 'No recipients added yet. Paste a list above to populate.'
                               : 'No recipients match the selected filter or search.'}
@@ -1043,6 +1068,30 @@ export default function CampaignsPage() {
                                   <span>Queued for dispatch</span>
                                 </span>
                               )}
+                            </td>
+                            <td className="p-3 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleRetrySingleRecipient(r.id)}
+                                disabled={isRetryingSingle === r.id}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 transition-all disabled:opacity-50 ${
+                                  r.status === 'FAILED'
+                                    ? 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30'
+                                    : r.status === 'PENDING'
+                                    ? 'bg-brand/20 text-brand-hover hover:bg-brand/30 border border-brand/30'
+                                    : 'bg-surface-2 text-foreground-subtle hover:text-foreground border border-border'
+                                }`}
+                                title={
+                                  r.status === 'FAILED'
+                                    ? 'Retry sending this email'
+                                    : r.status === 'PENDING'
+                                    ? 'Send this email now'
+                                    : 'Resend this email'
+                                }
+                              >
+                                <RefreshCw className={`w-3 h-3 ${isRetryingSingle === r.id ? 'animate-spin' : ''}`} />
+                                <span>{r.status === 'FAILED' ? 'Retry' : r.status === 'PENDING' ? 'Send' : 'Resend'}</span>
+                              </button>
                             </td>
                           </tr>
                         ))

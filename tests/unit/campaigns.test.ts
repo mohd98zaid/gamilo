@@ -204,6 +204,37 @@ describe('Campaigns & Publishing & Billing Suite', () => {
     expect(data.sent).toBe(2);
   });
 
+  it('retries dispatch for a single recipient via POST with recipientId', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      subject: 'Hello {{name}}',
+      body: 'Check out our offer for {{company}}',
+      fromChannelId: 'ch-1',
+      totalFailed: 1,
+      recipients: [
+        { id: 'rec-1', email: 'a@test.com', name: 'A', company: 'Co A', status: 'FAILED' },
+      ],
+    });
+    mocks.prisma.campaign.update.mockResolvedValue({
+      id: 'camp-1',
+      totalSent: 1,
+      totalFailed: 0,
+    });
+
+    const req = new Request('http://localhost:3000/api/campaigns/camp-1/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientId: 'rec-1' }),
+    });
+
+    const res = await sendCampaign(req, { params: Promise.resolve({ id: 'camp-1' }) });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(mocks.prisma.campaignRecipient.updateMany).toHaveBeenCalled();
+  });
+
   it('publishes a post and records metrics when publishing is enabled', async () => {
     process.env.ENABLE_SIMULATED_PUBLISHING = 'true';
     mocks.prisma.post.findFirst.mockResolvedValue({
