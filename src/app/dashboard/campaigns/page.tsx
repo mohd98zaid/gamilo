@@ -15,6 +15,7 @@ import {
   RefreshCw,
   ExternalLink,
   Link as LinkIcon,
+  Pencil,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 
@@ -45,8 +46,9 @@ export default function CampaignsPage() {
   const [channels, setChannels] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Create Campaign Modal
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  // Create / Edit Campaign Modal
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCampaignId, setEditingCampaignId] = useState<string | null>(null);
   const [campaignName, setCampaignName] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
@@ -64,6 +66,26 @@ export default function CampaignsPage() {
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
+
+  function handleOpenCreate() {
+    setEditingCampaignId(null);
+    setCampaignName('');
+    setSubject('');
+    setBody('');
+    setAiTopic('');
+    if (channels.length > 0) setSelectedChannelId(channels[0].id);
+    setIsModalOpen(true);
+  }
+
+  function handleOpenEdit(camp: Campaign) {
+    setEditingCampaignId(camp.id);
+    setCampaignName(camp.name);
+    setSubject(camp.subject);
+    setBody(camp.body || '');
+    setSelectedChannelId(camp.fromChannelId || (channels.length > 0 ? channels[0].id : ''));
+    setAiTopic('');
+    setIsModalOpen(true);
+  }
 
   function handleInsertLink() {
     const text = prompt('Enter clickable text (e.g. LinkedIn, GitHub, Portfolio):', 'LinkedIn');
@@ -112,33 +134,55 @@ export default function CampaignsPage() {
     }
   }
 
-  async function handleCreateCampaign(e: React.FormEvent) {
+  async function handleSaveCampaign(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const res = await fetch('/api/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: campaignName,
-          subject,
-          body,
-          fromChannelId: selectedChannelId || undefined,
-        }),
-      });
+      if (editingCampaignId) {
+        const res = await fetch(`/api/campaigns/${editingCampaignId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: campaignName,
+            subject,
+            body,
+            fromChannelId: selectedChannelId || undefined,
+          }),
+        });
 
-      if (res.ok) {
-        setIsCreateOpen(false);
-        setCampaignName('');
-        setSubject('');
-        setBody('');
-        setAiTopic('');
-        loadData();
+        if (res.ok) {
+          setIsModalOpen(false);
+          setEditingCampaignId(null);
+          loadData();
+        } else {
+          const err = await res.json();
+          alert(`Failed to update campaign: ${err.error || 'Unknown error'}`);
+        }
       } else {
-        const err = await res.json();
-        alert(`Failed to create: ${err.error || 'Unknown error'}`);
+        const res = await fetch('/api/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: campaignName,
+            subject,
+            body,
+            fromChannelId: selectedChannelId || undefined,
+          }),
+        });
+
+        if (res.ok) {
+          setIsModalOpen(false);
+          setCampaignName('');
+          setSubject('');
+          setBody('');
+          setAiTopic('');
+          loadData();
+        } else {
+          const err = await res.json();
+          alert(`Failed to create campaign: ${err.error || 'Unknown error'}`);
+        }
       }
     } catch {
-      alert('Error creating campaign');
+      alert('Error saving campaign');
     }
   }
 
@@ -347,7 +391,7 @@ export default function CampaignsPage() {
             </p>
           </div>
           <button
-            onClick={() => setIsCreateOpen(true)}
+            onClick={handleOpenCreate}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white text-xs font-bold transition-all shadow-md shadow-brand/20"
           >
             <Plus className="w-4 h-4" /> New Campaign
@@ -365,7 +409,7 @@ export default function CampaignsPage() {
               Create your first bulk campaign, upload a CSV or list of contacts, and send personalized emails through your connected Gmail.
             </p>
             <button
-              onClick={() => setIsCreateOpen(true)}
+              onClick={handleOpenCreate}
               className="inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-brand text-white text-xs font-bold"
             >
               <Plus className="w-4 h-4" /> Create Campaign
@@ -413,6 +457,15 @@ export default function CampaignsPage() {
 
                 <div className="flex items-center gap-2 shrink-0">
                   <button
+                    onClick={() => handleOpenEdit(camp)}
+                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
+                    title="Edit Campaign"
+                  >
+                    <Pencil className="w-3.5 h-3.5 text-foreground-muted" />
+                    <span>Edit</span>
+                  </button>
+
+                  <button
                     onClick={() => handleOpenRecipients(camp)}
                     className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
                   >
@@ -436,6 +489,7 @@ export default function CampaignsPage() {
                   <button
                     onClick={() => handleDeleteCampaign(camp.id)}
                     className="p-2 rounded-xl bg-surface-2 hover:bg-surface text-foreground-subtle hover:text-red-400 border border-border transition-colors"
+                    title="Delete Campaign"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -445,15 +499,15 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        {/* Create Campaign Modal */}
-        {isCreateOpen && (
+        {/* Create / Edit Campaign Modal */}
+        {isModalOpen && (
           <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
             <div className="bg-surface border border-brand/40 rounded-3xl max-w-xl w-full p-6 shadow-2xl my-8 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-brand" /> New Outreach Campaign
+                  <Mail className="w-4 h-4 text-brand" /> {editingCampaignId ? 'Edit Outreach Campaign' : 'New Outreach Campaign'}
                 </h3>
-                <button onClick={() => setIsCreateOpen(false)} className="text-foreground-subtle hover:text-foreground text-xs">
+                <button onClick={() => setIsModalOpen(false)} className="text-foreground-subtle hover:text-foreground text-xs">
                   ✕
                 </button>
               </div>
@@ -484,7 +538,7 @@ export default function CampaignsPage() {
                 </div>
               </div>
 
-              <form onSubmit={handleCreateCampaign} className="space-y-3.5">
+              <form onSubmit={handleSaveCampaign} className="space-y-3.5">
                 <div>
                   <label className="block text-xs font-semibold text-foreground-muted mb-1">
                     Campaign Name
@@ -587,7 +641,7 @@ export default function CampaignsPage() {
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setIsCreateOpen(false)}
+                    onClick={() => setIsModalOpen(false)}
                     className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground"
                   >
                     Cancel
@@ -596,7 +650,7 @@ export default function CampaignsPage() {
                     type="submit"
                     className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white font-bold text-xs shadow-md shadow-brand/20 transition-all"
                   >
-                    Save Campaign
+                    {editingCampaignId ? 'Update Campaign' : 'Save Campaign'}
                   </button>
                 </div>
               </form>
