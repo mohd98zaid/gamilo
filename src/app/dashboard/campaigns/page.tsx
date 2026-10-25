@@ -1035,8 +1035,8 @@ export default function CampaignsPage() {
                         filteredRecipients.map((r) => (
                           <tr key={r.id} className="hover:bg-surface-2/40">
                             <td className="p-3 font-mono">{r.email}</td>
-                            <td className="p-3">{r.name || '—'}</td>
-                            <td className="p-3">{r.company || '—'}</td>
+                            <td className="p-3">{r.name || '-'}</td>
+                            <td className="p-3">{r.company || '-'}</td>
                             <td className="p-3">
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
