@@ -28,6 +28,27 @@ export interface SendBulkOptions {
 }
 
 /**
+ * Resolves Spintax dynamic text variations (e.g. "{Hi|Hello|Hey}") to randomize sentence structure.
+ * Supports nested spintax patterns like "{Hi {there|friend}|Hello}".
+ * Ignores braces without a pipe symbol to safeguard single/double curly syntax like {{name}}.
+ */
+export function parseSpintax(text: string): string {
+  if (!text) return '';
+  const spintaxRegex = /\{([^{}]+?\|[^{}]+?)\}/g;
+  let result = text;
+  let loops = 0;
+  while (spintaxRegex.test(result) && loops < 10) {
+    result = result.replace(spintaxRegex, (_match, group) => {
+      const options = group.split('|');
+      const chosen = options[Math.floor(Math.random() * options.length)];
+      return chosen !== undefined ? chosen : '';
+    });
+    loops++;
+  }
+  return result;
+}
+
+/**
  * Cleans a channel name into a human display name suitable for RFC 5322 From headers
  * (e.g. "Mohammad Zaid (mohd98zaid@gmail.com)" -> "Mohammad Zaid")
  */
@@ -216,26 +237,30 @@ export async function sendBulkEmails(options: SendBulkOptions) {
   for (let i = 0; i < options.recipients.length; i++) {
     const recipient = options.recipients[i];
     
-    // Replace variables in subject and body
-    const personalizedSubject = options.subject
+    // 1. Replace variables in subject and body
+    const interpolatedSubject = options.subject
       .replace(/{{name}}/gi, recipient.name || 'there')
       .replace(/{{email}}/gi, recipient.email)
       .replace(/{{company}}/gi, recipient.company || 'your team');
 
-    const personalizedRaw = options.bodyTemplate
+    const interpolatedBody = options.bodyTemplate
       .replace(/{{name}}/gi, recipient.name || 'there')
       .replace(/{{email}}/gi, recipient.email)
       .replace(/{{company}}/gi, recipient.company || 'your team');
 
-    const personalizedHtml = formatEmailBodyToHtml(personalizedRaw);
-    const plainText = personalizedRaw.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
+    // 2. Resolve Spintax dynamic alternatives per recipient to prevent content fingerprinting
+    const finalSubject = parseSpintax(interpolatedSubject);
+    const finalBodyRaw = parseSpintax(interpolatedBody);
+
+    const personalizedHtml = formatEmailBodyToHtml(finalBodyRaw);
+    const plainText = finalBodyRaw.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
 
     try {
       await transporter.sendMail({
         from: `"${senderName}" <${senderEmail}>`,
         to: recipient.email,
         replyTo: senderEmail,
-        subject: personalizedSubject,
+        subject: finalSubject,
         html: personalizedHtml,
         text: plainText,
       });
@@ -249,9 +274,12 @@ export async function sendBulkEmails(options: SendBulkOptions) {
       });
     }
 
-    // Delay between sends to prevent triggering rate limits / spam filters
+    // Anti-bot randomized delay between sends (±35% jitter) to mimic human behavior
     if (i < options.recipients.length - 1 && delayMs > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      const minDelay = Math.max(100, Math.floor(delayMs * 0.65));
+      const maxExtra = Math.floor(delayMs * 0.7);
+      const randomizedJitter = minDelay + Math.floor(Math.random() * maxExtra);
+      await new Promise((resolve) => setTimeout(resolve, randomizedJitter));
     }
   }
 

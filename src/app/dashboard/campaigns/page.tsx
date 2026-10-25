@@ -16,6 +16,8 @@ import {
   ExternalLink,
   Link as LinkIcon,
   Pencil,
+  Shuffle,
+  ShieldCheck,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 
@@ -99,6 +101,38 @@ export default function CampaignsPage() {
 
   function handleInsertTag(tag: string) {
     setBody((prev) => (prev ? `${prev} ${tag}` : tag));
+  }
+
+  function handleInsertSpintax() {
+    const input = prompt(
+      'Enter alternatives separated by | (e.g. Hi|Hello|Hey or I noticed|I saw):',
+      'Hi|Hello|Hey'
+    );
+    if (!input) return;
+    const clean = input.trim().replace(/^\{+|\}+$/g, '');
+    const spintaxTag = `{${clean}}`;
+    setBody((prev) => (prev ? `${prev} ${spintaxTag}` : spintaxTag));
+  }
+
+  function handleTestSpintax() {
+    if (!body.trim()) {
+      alert('Write or paste email body first to test Spintax.');
+      return;
+    }
+    const spintaxRegex = /\{([^{}]+?\|[^{}]+?)\}/g;
+    let sample = body;
+    let loops = 0;
+    while (spintaxRegex.test(sample) && loops < 10) {
+      sample = sample.replace(spintaxRegex, (_match, group) => {
+        const options = group.split('|');
+        return options[Math.floor(Math.random() * options.length)] ?? '';
+      });
+      loops++;
+    }
+    sample = sample
+      .replace(/{{name}}/gi, 'Sarah')
+      .replace(/{{company}}/gi, 'Acme Corp');
+    alert(`🎲 Live Spintax Variation Preview (for Sarah @ Acme Corp):\n\n${sample}`);
   }
 
   useEffect(() => {
@@ -596,11 +630,11 @@ export default function CampaignsPage() {
                   </div>
 
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
                       <label className="text-xs font-semibold text-foreground-muted">
                         Email Body Template
                       </label>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           type="button"
                           onClick={() => handleInsertTag('{{name}}')}
@@ -619,28 +653,53 @@ export default function CampaignsPage() {
                         </button>
                         <button
                           type="button"
+                          onClick={handleInsertSpintax}
+                          className="px-2 py-0.5 rounded-lg bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-[10px] text-purple-400 font-bold flex items-center gap-1 transition-colors"
+                          title="Insert anti-spam dynamic Spintax: {Hi|Hello|Hey}"
+                        >
+                          <Shuffle className="w-3 h-3" /> + {'{Spintax}'}
+                        </button>
+                        <button
+                          type="button"
                           onClick={handleInsertLink}
                           className="px-2 py-0.5 rounded-lg bg-brand/10 hover:bg-brand/20 border border-brand/20 text-[10px] text-brand font-bold flex items-center gap-1 transition-colors"
                           title="Insert clickable hyperlink"
                         >
-                          <LinkIcon className="w-3 h-3" /> Insert Link
+                          <LinkIcon className="w-3 h-3" /> Link
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTestSpintax}
+                          className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] text-foreground-subtle hover:text-foreground font-semibold flex items-center gap-1 transition-colors"
+                          title="Test how random Spintax variations will look for a recipient"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-400" /> Preview Variation
                         </button>
                       </div>
                     </div>
                     <textarea
                       required
                       rows={5}
-                      placeholder="Hi {{name}},&#10;&#10;I noticed your work at {{company}}...&#10;&#10;Connect with me:&#10;[LinkedIn](https://linkedin.com/in/...) | [GitHub](https://github.com/...)"
+                      placeholder="{Hi|Hello|Hey} {{name}},&#10;&#10;{I noticed|I saw} your work at {{company}}...&#10;&#10;Connect with me:&#10;[LinkedIn](https://linkedin.com/in/...) | [GitHub](https://github.com/...)"
                       value={body}
                       onChange={(e) => setBody(e.target.value)}
                       className="w-full p-3 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-sans leading-relaxed"
                     />
-                    <div className="mt-1.5 p-2 rounded-xl bg-surface-2/60 border border-border text-[11px] text-foreground-subtle leading-normal">
-                      <span className="font-semibold text-brand">💡 How to add clickable hyperlinks:</span>
-                      <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                        <li>Use markdown syntax: <code>[LinkedIn](https://linkedin.com/in/yourname)</code> or click <strong>Insert Link</strong> above.</li>
-                        <li>Or paste full raw URLs: <code>https://github.com/yourname</code> (automatically converted into clickable links).</li>
-                        <li><strong>Plain words</strong> like <code>LinkedIn</code> without a URL won't be clickable because the email client doesn't know where to link.</li>
+                    <div className="mt-1.5 p-2.5 rounded-xl bg-surface-2/60 border border-border text-[11px] text-foreground-subtle leading-normal space-y-1.5">
+                      <div className="flex items-center gap-1.5 text-purple-400 font-bold">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Anti-Spam Deliverability Protections Active:</span>
+                      </div>
+                      <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                        <li>
+                          <strong className="text-foreground">Spintax Variations:</strong> Use <code>{'{Hi|Hello|Hey}'}</code> or <code>{'{I noticed|I came across}'}</code>. Every recipient receives a unique combination of sentences so spam filters cannot fingerprint your email.
+                        </li>
+                        <li>
+                          <strong className="text-foreground">Humanized Jitter Delay:</strong> Outgoing emails are sent with randomized delays to avoid robotic rate-limit triggers.
+                        </li>
+                        <li>
+                          <strong className="text-foreground">Clickable Hyperlinks:</strong> Use <code>[LinkedIn](https://...)</code> or click <strong>Link</strong> above.
+                        </li>
                       </ul>
                     </div>
                   </div>

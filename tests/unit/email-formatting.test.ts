@@ -1,5 +1,31 @@
 import { describe, it, expect } from 'vitest';
-import { formatEmailBodyToHtml, extractCleanSenderName } from '@/lib/email/sender';
+import { formatEmailBodyToHtml, extractCleanSenderName, parseSpintax } from '@/lib/email/sender';
+
+describe('Spintax Anti-Spam Variation Resolver', () => {
+  it('resolves simple spintax options randomly', () => {
+    const raw = '{Hi|Hello|Hey} there!';
+    const result = parseSpintax(raw);
+    expect(['Hi there!', 'Hello there!', 'Hey there!']).toContain(result);
+  });
+
+  it('supports multiple spintax blocks in a single text', () => {
+    const raw = '{Hi|Hey} {John|Alex}, {welcome|glad to meet you}!';
+    const result = parseSpintax(raw);
+    expect(result).toMatch(/^(Hi|Hey) (John|Alex), (welcome|glad to meet you)!$/);
+  });
+
+  it('supports nested spintax variations', () => {
+    const raw = '{Hi {there|friend}|Hello}!';
+    const result = parseSpintax(raw);
+    expect(['Hi there!', 'Hi friend!', 'Hello!']).toContain(result);
+  });
+
+  it('does not corrupt merge variables or non-spintax braces without pipe', () => {
+    const raw = '{Hi|Hello} {{name}}, your balance is {amount}.';
+    const result = parseSpintax(raw);
+    expect(result).toMatch(/^(Hi|Hello) {{name}}, your balance is {amount}\.$/);
+  });
+});
 
 describe('Sender Display Name Extractor', () => {
   it('strips parenthesized email address from channel name', () => {
