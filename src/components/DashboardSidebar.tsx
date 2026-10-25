@@ -14,6 +14,7 @@ import {
   Settings,
   Sparkles,
   ExternalLink,
+  Mail,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -37,6 +38,7 @@ export function DashboardSidebar() {
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
     { name: 'Content Calendar', href: '/dashboard/calendar', icon: Calendar },
     { name: 'Create Post', href: '/dashboard/posts/new', icon: PenSquare },
+    { name: 'Email Campaigns', href: '/dashboard/campaigns', icon: Mail },
     { name: 'Unified Inbox', href: '/dashboard/inbox', icon: Inbox },
     { name: 'AI Studio', href: '/dashboard/ai-studio', icon: Sparkles },
     { name: 'Channels', href: '/dashboard/channels', icon: Share2 },

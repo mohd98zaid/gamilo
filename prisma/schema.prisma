@@ -184,9 +184,46 @@ model Campaign {
   workspaceId   String
   workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   name          String
-  type          String    // EMAIL, WHATSAPP
-  status        String    @default("DRAFT") // DRAFT, ACTIVE, PAUSED, COMPLETED
+  subject       String?
+  body          String?
+  fromChannelId String?
+  type          String    @default("EMAIL") // EMAIL, WHATSAPP
+  status        String    @default("DRAFT") // DRAFT, SCHEDULED, SENDING, COMPLETED, PAUSED
+  totalSent     Int       @default(0)
+  totalFailed   Int       @default(0)
+  steps         CampaignStep[]
+  recipients    CampaignRecipient[]
+  startedAt     DateTime?
+  completedAt   DateTime?
   createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model CampaignStep {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepNumber    Int
+  subject       String?
+  body          String
+  delayDays     Int       @default(0)
+
+  @@unique([campaignId, stepNumber])
+}
+
+model CampaignRecipient {
+  id            String    @id @default(cuid())
+  campaignId    String
+  campaign      Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email         String
+  name          String?
+  company       String?
+  status        String    @default("PENDING") // PENDING, SENT, FAILED, BOUNCED
+  sentAt        DateTime?
+  errorMessage  String?
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
 }
 
 model Automation {
