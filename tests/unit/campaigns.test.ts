@@ -45,7 +45,7 @@ vi.mock('@/lib/email/sender', () => ({
 }));
 
 import { GET as getCampaigns, POST as createCampaign } from '@/app/api/campaigns/route';
-import { POST as addRecipients } from '@/app/api/campaigns/[id]/recipients/route';
+import { POST as addRecipients, PATCH as retryRecipients } from '@/app/api/campaigns/[id]/recipients/route';
 import { POST as sendCampaign } from '@/app/api/campaigns/[id]/send/route';
 import { POST as publishPost } from '@/app/api/posts/[id]/publish/route';
 import { POST as checkoutBilling } from '@/app/api/billing/checkout/route';
@@ -141,6 +141,39 @@ describe('Campaigns & Publishing & Billing Suite', () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.addedCount).toBe(2);
+  });
+
+  it('resets failed recipients to PENDING via PATCH', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      status: 'COMPLETED',
+      totalFailed: 2,
+    });
+    mocks.prisma.campaignRecipient.updateMany.mockResolvedValue({ count: 2 });
+    mocks.prisma.campaign.update.mockResolvedValue({
+      id: 'camp-1',
+      status: 'PAUSED',
+      totalFailed: 0,
+    });
+
+    const req = new Request('http://localhost:3000/api/campaigns/camp-1/recipients', {
+      method: 'PATCH',
+    });
+
+    const res = await retryRecipients(req, { params: Promise.resolve({ id: 'camp-1' }) });
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.retriedCount).toBe(2);
+    expect(mocks.prisma.campaignRecipient.updateMany).toHaveBeenCalledWith({
+      where: { campaignId: 'camp-1', status: 'FAILED' },
+      data: { status: 'PENDING', errorMessage: null },
+    });
+    expect(mocks.prisma.campaign.update).toHaveBeenCalledWith({
+      where: { id: 'camp-1' },
+      data: { status: 'PAUSED', totalFailed: 0 },
+    });
   });
 
   it('sends campaign to pending recipients', async () => {

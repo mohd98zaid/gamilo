@@ -27,6 +27,7 @@ export default function ChannelsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedPlatform, setSelectedPlatform] = useState('INSTAGRAM');
   const [accountName, setAccountName] = useState('');
+  const [socialToken, setSocialToken] = useState('');
   const [isConnecting, setIsConnecting] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [oauthError, setOauthError] = useState<string | null>(null);
@@ -106,8 +107,8 @@ export default function ChannelsPage() {
       const payload: any = {
         platform: selectedPlatform,
         name: isEmail ? (emailSenderName ? `${emailSenderName} (${emailAddress})` : emailAddress) : accountName,
-        platformId: isEmail ? emailAddress : `pid_${Date.now()}`,
-        accessToken: isEmail ? emailSecret : undefined,
+        platformId: isEmail ? emailAddress : (accountName ? `@${accountName.replace(/^@/, '')}` : `pid_${Date.now()}`),
+        accessToken: isEmail ? emailSecret : (socialToken.trim() || undefined),
       };
 
       if (isEmail) {
@@ -127,6 +128,7 @@ export default function ChannelsPage() {
 
       if (res.ok) {
         setAccountName('');
+        setSocialToken('');
         setEmailAddress('');
         setEmailSecret('');
         setEmailSenderName('');
@@ -565,18 +567,38 @@ export default function ChannelsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div>
-                    <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
-                      Account Handle or Page Name
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. @haven.coffee or Haven Bakery"
-                      value={accountName}
-                      onChange={(e) => setAccountName(e.target.value)}
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
-                    />
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+                        Account Handle or Page Name
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. @haven.coffee or mohd98zaid"
+                        value={accountName}
+                        onChange={(e) => setAccountName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex justify-between items-center mb-1.5">
+                        <label className="text-xs font-semibold text-foreground-muted">
+                          Meta / Provider Access Token <span className="text-foreground-subtle font-normal">(Optional)</span>
+                        </label>
+                      </div>
+                      <input
+                        type="password"
+                        placeholder="Leave blank for post drafting & calendar scheduling"
+                        value={socialToken}
+                        onChange={(e) => setSocialToken(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                      />
+                      <p className="mt-1 text-[11px] text-foreground-subtle">
+                        You can connect with just your handle to schedule posts in the calendar and generate AI captions.
+                      </p>
+                    </div>
                   </div>
                 )}
 

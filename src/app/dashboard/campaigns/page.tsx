@@ -73,6 +73,7 @@ export default function CampaignsPage() {
 
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
+  const [isRetryingFailed, setIsRetryingFailed] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
 
   function handleOpenCreate() {
@@ -361,6 +362,28 @@ export default function CampaignsPage() {
     }
   }
 
+  async function handleRetryFailedCampaign(campId: string) {
+    setIsRetryingFailed(campId);
+    try {
+      const res = await fetch(`/api/campaigns/${campId}/recipients`, {
+        method: 'PATCH',
+      });
+      const d = await res.json();
+      if (res.ok) {
+        if (activeCampaign && activeCampaign.id === campId) {
+          await handleOpenRecipients(activeCampaign);
+        }
+        await loadData();
+      } else {
+        alert(d.error || 'Failed to reset failed recipients');
+      }
+    } catch {
+      alert('Error resetting failed recipients');
+    } finally {
+      setIsRetryingFailed(null);
+    }
+  }
+
   async function handleDeleteCampaign(id: string) {
     if (!confirm('Delete this campaign?')) return;
     try {
@@ -579,6 +602,18 @@ export default function CampaignsPage() {
                     <Users className="w-3.5 h-3.5" />
                     <span>Manage Recipients ({camp.totalRecipients})</span>
                   </button>
+
+                  {camp.totalFailed > 0 && (
+                    <button
+                      onClick={() => handleRetryFailedCampaign(camp.id)}
+                      disabled={isRetryingFailed === camp.id}
+                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      title="Reset failed recipients to Pending so they can be re-sent"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRetryingFailed === camp.id ? 'animate-spin' : ''}`} />
+                      <span>Retry Failed ({camp.totalFailed})</span>
+                    </button>
+                  )}
 
                   <button
                     onClick={() => handleSendCampaign(camp.id)}
@@ -910,18 +945,30 @@ export default function CampaignsPage() {
                       <span>Pending ({countPending})</span>
                     </button>
                     {countFailed > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setRecipientFilter('FAILED')}
-                        className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
-                          recipientFilter === 'FAILED'
-                            ? 'bg-red-500 text-white shadow-sm'
-                            : 'text-red-400 hover:bg-red-500/10'
-                        }`}
-                      >
-                        <AlertCircle className="w-3 h-3" />
-                        <span>Failed ({countFailed})</span>
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setRecipientFilter('FAILED')}
+                          className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+                            recipientFilter === 'FAILED'
+                              ? 'bg-red-500 text-white shadow-sm'
+                              : 'text-red-400 hover:bg-red-500/10'
+                          }`}
+                        >
+                          <AlertCircle className="w-3 h-3" />
+                          <span>Failed ({countFailed})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRetryFailedCampaign(activeCampaign.id)}
+                          disabled={isRetryingFailed === activeCampaign.id}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 border border-amber-500/30 transition-all shrink-0 disabled:opacity-50"
+                          title="Reset all failed contacts back to Pending so you can send again"
+                        >
+                          <RefreshCw className={`w-3 h-3 ${isRetryingFailed === activeCampaign.id ? 'animate-spin' : ''}`} />
+                          <span>Retry Failed ({countFailed})</span>
+                        </button>
+                      </>
                     )}
                   </div>
 
