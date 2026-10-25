@@ -14,6 +14,7 @@ import {
   FileText,
   RefreshCw,
   ExternalLink,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 
@@ -63,6 +64,20 @@ export default function CampaignsPage() {
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
+
+  function handleInsertLink() {
+    const text = prompt('Enter clickable text (e.g. LinkedIn, GitHub, Portfolio):', 'LinkedIn');
+    if (!text) return;
+    const url = prompt(`Enter destination URL for "${text}":`, 'https://');
+    if (!url) return;
+    const cleanUrl = url.trim().startsWith('http') ? url.trim() : `https://${url.trim()}`;
+    const mdLink = `[${text}](${cleanUrl})`;
+    setBody((prev) => (prev ? `${prev} ${mdLink}` : mdLink));
+  }
+
+  function handleInsertTag(tag: string) {
+    setBody((prev) => (prev ? `${prev} ${tag}` : tag));
+  }
 
   useEffect(() => {
     loadData();
@@ -520,22 +535,53 @@ export default function CampaignsPage() {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1.5">
                     <label className="text-xs font-semibold text-foreground-muted">
                       Email Body Template
                     </label>
-                    <span className="text-[10px] text-foreground-subtle">
-                      Supported tags: <code>{'{{name}}'}</code>, <code>{'{{company}}'}</code>
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleInsertTag('{{name}}')}
+                        className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
+                        title="Insert recipient name"
+                      >
+                        + {'{{name}}'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertTag('{{company}}')}
+                        className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
+                        title="Insert company name"
+                      >
+                        + {'{{company}}'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleInsertLink}
+                        className="px-2 py-0.5 rounded-lg bg-brand/10 hover:bg-brand/20 border border-brand/20 text-[10px] text-brand font-bold flex items-center gap-1 transition-colors"
+                        title="Insert clickable hyperlink"
+                      >
+                        <LinkIcon className="w-3 h-3" /> Insert Link
+                      </button>
+                    </div>
                   </div>
                   <textarea
                     required
-                    rows={6}
-                    placeholder="Hi {{name}},&#10;&#10;I noticed your work at {{company}}..."
+                    rows={7}
+                    placeholder="Hi {{name}},&#10;&#10;I noticed your work at {{company}}...&#10;&#10;Connect with me:&#10;[LinkedIn](https://linkedin.com/in/...) | [GitHub](https://github.com/...)"
                     value={body}
                     onChange={(e) => setBody(e.target.value)}
                     className="w-full p-3 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-sans leading-relaxed"
                   />
+                  <div className="mt-1.5 p-2 rounded-xl bg-surface-2/60 border border-border text-[11px] text-foreground-subtle leading-normal">
+                    <span className="font-semibold text-brand">💡 How to add clickable hyperlinks:</span>
+                    <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                      <li>Use markdown syntax: <code>[LinkedIn](https://linkedin.com/in/yourname)</code> or click <strong>Insert Link</strong> above.</li>
+                      <li>Or paste full raw URLs: <code>https://github.com/yourname</code> (automatically converted into clickable links).</li>
+                      <li><strong>Plain words</strong> like <code>LinkedIn</code> without a URL won't be clickable because the email client doesn't know where to link.</li>
+                    </ul>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">

@@ -28,6 +28,55 @@ export interface SendBulkOptions {
 }
 
 /**
+ * Converts raw template text or markdown into responsive HTML email with clickable hyperlinks
+ */
+export function formatEmailBodyToHtml(content: string): string {
+  if (!content) return '';
+
+  if (/<html|<body/i.test(content)) {
+    return content;
+  }
+
+  // 1. Convert markdown links [Text](URL) into <a href="URL">Text</a>
+  let html = content.replace(
+    /\[([^\]]+)\]\(((?:https?:\/\/|mailto:)[^\s)]+)\)/gi,
+    '<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline; font-weight: 500;">$1</a>'
+  );
+
+  // 2. Convert standalone raw URLs (not already part of an href tag) to clickable links
+  html = html.replace(
+    /(^|[\s>(])((?:https?:\/\/)[^\s<)]+)/gi,
+    '$1<a href="$2" target="_blank" rel="noopener noreferrer" style="color: #2563eb; text-decoration: underline;">$2</a>'
+  );
+
+  // 3. Convert paragraphs & linebreaks
+  const paragraphs = html.split(/\r?\n\s*\r?\n/);
+  const formattedHtml = paragraphs
+    .map(
+      (para) =>
+        `<p style="margin: 0 0 16px 0; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 15px; color: #1e293b;">${para.replace(
+          /\r?\n/g,
+          '<br />'
+        )}</p>`
+    )
+    .join('');
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #1e293b;">
+  <div style="max-width: 600px; margin: 0 auto;">
+    ${formattedHtml}
+  </div>
+</body>
+</html>`.trim();
+}
+
+/**
  * Resolves a channel and creates a configured nodemailer transporter
  */
 export async function getEmailTransporter(workspaceId: string, channelId?: string) {
@@ -109,12 +158,14 @@ export async function sendEmail(options: SendEmailOptions) {
     options.channelId
   );
 
+  const htmlBody = options.html || formatEmailBodyToHtml(options.text || '');
+
   const mailOptions = {
     from: `"${senderName}" <${senderEmail}>`,
     to: options.to,
     subject: options.subject,
     text: options.text || options.html?.replace(/<[^>]*>?/gm, '') || '',
-    html: options.html,
+    html: htmlBody,
   };
 
   const info = await transporter.sendMail(mailOptions);
@@ -125,7 +176,7 @@ export async function sendEmail(options: SendEmailOptions) {
 }
 
 /**
- * Dispatches bulk emails with template variable interpolation and anti-spam delay
+ * Dispatches bulk emails with template variable interpolation, hyperlinking, and anti-spam delay
  */
 export async function sendBulkEmails(options: SendBulkOptions) {
   const { transporter, senderEmail, senderName } = await getEmailTransporter(
@@ -145,10 +196,13 @@ export async function sendBulkEmails(options: SendBulkOptions) {
       .replace(/{{email}}/gi, recipient.email)
       .replace(/{{company}}/gi, recipient.company || 'your team');
 
-    const personalizedHtml = options.bodyTemplate
+    const personalizedRaw = options.bodyTemplate
       .replace(/{{name}}/gi, recipient.name || 'there')
       .replace(/{{email}}/gi, recipient.email)
       .replace(/{{company}}/gi, recipient.company || 'your team');
+
+    const personalizedHtml = formatEmailBodyToHtml(personalizedRaw);
+    const plainText = personalizedRaw.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)');
 
     try {
       await transporter.sendMail({
@@ -156,7 +210,7 @@ export async function sendBulkEmails(options: SendBulkOptions) {
         to: recipient.email,
         subject: personalizedSubject,
         html: personalizedHtml,
-        text: personalizedHtml.replace(/<[^>]*>?/gm, ''),
+        text: plainText,
       });
 
       results.push({ email: recipient.email, success: true });
