@@ -49,6 +49,36 @@ export function parseSpintax(text: string): string {
 }
 
 /**
+ * Replaces {{name}}, {{company}}, and {{email}} variables with safe, natural generic
+ * fallbacks when the recipient's name or company is missing, unclear, or generic.
+ */
+export function resolveGenericFallback(
+  text: string,
+  recipient: { name?: string | null; email: string; company?: string | null }
+): string {
+  if (!text) return '';
+
+  const rawName = (recipient.name || '').trim();
+  const isNameClear =
+    Boolean(rawName) &&
+    !['null', 'undefined', '—', '-', 'none', 'unknown', 'n/a', 'na'].includes(rawName.toLowerCase());
+  const resolvedName = isNameClear ? rawName : 'there';
+
+  const rawCompany = (recipient.company || '').trim();
+  const isCompanyClear =
+    Boolean(rawCompany) &&
+    !['null', 'undefined', '—', '-', 'none', 'unknown', 'n/a', 'na', 'gmail', 'yahoo', 'outlook', 'hotmail'].includes(
+      rawCompany.toLowerCase()
+    );
+  const resolvedCompany = isCompanyClear ? rawCompany : 'your team';
+
+  return text
+    .replace(/{{name}}/gi, resolvedName)
+    .replace(/{{email}}/gi, recipient.email)
+    .replace(/{{company}}/gi, resolvedCompany);
+}
+
+/**
  * Cleans a channel name into a human display name suitable for RFC 5322 From headers
  * (e.g. "Mohammad Zaid (mohd98zaid@gmail.com)" -> "Mohammad Zaid")
  */
@@ -237,16 +267,9 @@ export async function sendBulkEmails(options: SendBulkOptions) {
   for (let i = 0; i < options.recipients.length; i++) {
     const recipient = options.recipients[i];
     
-    // 1. Replace variables in subject and body
-    const interpolatedSubject = options.subject
-      .replace(/{{name}}/gi, recipient.name || 'there')
-      .replace(/{{email}}/gi, recipient.email)
-      .replace(/{{company}}/gi, recipient.company || 'your team');
-
-    const interpolatedBody = options.bodyTemplate
-      .replace(/{{name}}/gi, recipient.name || 'there')
-      .replace(/{{email}}/gi, recipient.email)
-      .replace(/{{company}}/gi, recipient.company || 'your team');
+    // 1. Replace variables in subject and body with safe generic fallbacks
+    const interpolatedSubject = resolveGenericFallback(options.subject, recipient);
+    const interpolatedBody = resolveGenericFallback(options.bodyTemplate, recipient);
 
     // 2. Resolve Spintax dynamic alternatives per recipient to prevent content fingerprinting
     const finalSubject = parseSpintax(interpolatedSubject);

@@ -1,5 +1,49 @@
 import { describe, it, expect } from 'vitest';
-import { formatEmailBodyToHtml, extractCleanSenderName, parseSpintax } from '@/lib/email/sender';
+import {
+  formatEmailBodyToHtml,
+  extractCleanSenderName,
+  parseSpintax,
+  resolveGenericFallback,
+} from '@/lib/email/sender';
+
+describe('Generic Fallback Resolver for Missing Names & Companies', () => {
+  it('falls back to "there" when name is missing or unclear', () => {
+    const template = 'Hi {{name}}, wanted to connect.';
+    expect(resolveGenericFallback(template, { email: 'test@example.com', name: null })).toBe(
+      'Hi there, wanted to connect.'
+    );
+    expect(resolveGenericFallback(template, { email: 'test@example.com', name: '—' })).toBe(
+      'Hi there, wanted to connect.'
+    );
+    expect(resolveGenericFallback(template, { email: 'test@example.com', name: 'unknown' })).toBe(
+      'Hi there, wanted to connect.'
+    );
+  });
+
+  it('falls back to "your team" when company is missing or public webmail', () => {
+    const template = 'Saw what {{company}} is building.';
+    expect(resolveGenericFallback(template, { email: 'test@gmail.com', company: null })).toBe(
+      'Saw what your team is building.'
+    );
+    expect(resolveGenericFallback(template, { email: 'test@gmail.com', company: 'gmail' })).toBe(
+      'Saw what your team is building.'
+    );
+    expect(resolveGenericFallback(template, { email: 'test@example.com', company: '—' })).toBe(
+      'Saw what your team is building.'
+    );
+  });
+
+  it('uses specific names and companies when they are clear', () => {
+    const template = 'Hi {{name}}, saw what {{company}} is building.';
+    expect(
+      resolveGenericFallback(template, {
+        email: 'alex@stripe.com',
+        name: 'Alex Turner',
+        company: 'Stripe',
+      })
+    ).toBe('Hi Alex Turner, saw what Stripe is building.');
+  });
+});
 
 describe('Spintax Anti-Spam Variation Resolver', () => {
   it('resolves simple spintax options randomly', () => {
