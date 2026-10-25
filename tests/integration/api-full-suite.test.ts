@@ -130,13 +130,21 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
     });
 
     it('does not claim publication before a provider is configured', async () => {
-      const req = new Request(`http://localhost:3000/api/posts/${createdPostId}/publish`, {
-        method: 'POST',
-      });
-      const res = await publishPost(req, { params: { id: createdPostId } });
-      expect(res.status).toBe(501);
-      const data = await res.json();
-      expect(data.error).toContain('not configured');
+      const prev = process.env.ENABLE_SIMULATED_PUBLISHING;
+      delete process.env.ENABLE_SIMULATED_PUBLISHING;
+      try {
+        const req = new Request(`http://localhost:3000/api/posts/${createdPostId}/publish`, {
+          method: 'POST',
+        });
+        const res = await publishPost(req, { params: { id: createdPostId } });
+        expect(res.status).toBe(501);
+        const data = await res.json();
+        expect(data.error).toContain('not configured');
+      } finally {
+        if (prev !== undefined) {
+          process.env.ENABLE_SIMULATED_PUBLISHING = prev;
+        }
+      }
     });
 
     it('deletes post from store', async () => {

@@ -40,9 +40,12 @@ export default function CalendarPage() {
     setIsPublishing(true);
     try {
       const res = await fetch(`/api/posts/${id}/publish`, { method: 'POST' });
+      const d = await res.json();
       if (res.ok) {
         setSelectedPost(null);
         fetchPosts();
+      } else {
+        alert(d.error || 'Failed to publish post');
       }
     } catch {
       alert('Failed to publish');
