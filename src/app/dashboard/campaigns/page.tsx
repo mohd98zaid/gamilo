@@ -241,20 +241,47 @@ export default function CampaignsPage() {
     setIsImporting(true);
 
     try {
-      const lines = rawContactsText.split('\n');
+      const EMAIL_REGEX = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/;
+      const lines = rawContactsText.split(/\r?\n/);
       const parsedList: Array<{ email: string; name?: string; company?: string }> = [];
+      const seenEmails = new Set<string>();
 
       for (const line of lines) {
-        const parts = line.split(',').map((s) => s.trim());
-        if (parts[0] && parts[0].includes('@')) {
-          // Automatically infer Name and Company if missing!
-          const inferred = inferContactDetails(parts[0], parts[1], parts[2]);
-          parsedList.push(inferred);
+        const trimmedLine = line.trim();
+        if (!trimmedLine) continue;
+
+        const emailMatch = trimmedLine.match(EMAIL_REGEX);
+        if (!emailMatch) continue;
+
+        const email = emailMatch[0].toLowerCase();
+        if (seenEmails.has(email)) continue;
+        seenEmails.add(email);
+
+        const parts = trimmedLine.split(',').map((s) => s.trim());
+        let explicitName: string | undefined = undefined;
+        let explicitCompany: string | undefined = undefined;
+
+        if (parts.length >= 2) {
+          if (parts[0].toLowerCase().includes(email)) {
+            explicitName = parts[1] || undefined;
+            explicitCompany = parts[2] || undefined;
+          } else if (parts[1].toLowerCase().includes(email)) {
+            explicitName = parts[0] || undefined;
+            explicitCompany = parts[2] || undefined;
+          }
         }
+
+        // Auto-detect missing Name and Company
+        const inferred = inferContactDetails(email, explicitName, explicitCompany);
+        parsedList.push({
+          email: inferred.email,
+          name: inferred.name || undefined,
+          company: inferred.company || undefined,
+        });
       }
 
       if (parsedList.length === 0) {
-        alert('No valid email addresses found.');
+        alert('No valid email addresses found in the pasted text.');
         setIsImporting(false);
         return;
       }
@@ -271,10 +298,13 @@ export default function CampaignsPage() {
         loadData();
       } else {
         const d = await res.json();
-        alert(`Error importing: ${d.error || 'Failed'}`);
+        const errDetail = typeof d.error === 'string'
+          ? d.error
+          : (d.error?.message || JSON.stringify(d.error) || 'Failed to import recipients');
+        alert(`Error importing: ${errDetail}`);
       }
     } catch {
-      alert('Error importing recipients');
+      alert('Error importing recipients. Please check connection.');
     } finally {
       setIsImporting(false);
     }

@@ -6,8 +6,8 @@ import { inferContactDetails } from '@/lib/email/contact-infer';
 
 const recipientItemSchema = z.object({
   email: z.string().trim().email(),
-  name: z.string().trim().optional(),
-  company: z.string().trim().optional(),
+  name: z.string().trim().nullish().transform((v) => v || undefined),
+  company: z.string().trim().nullish().transform((v) => v || undefined),
 });
 
 const addRecipientsSchema = z.object({
@@ -28,7 +28,11 @@ export async function POST(
     const json = await req.json();
     const parsed = addRecipientsSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.format() }, { status: 400 });
+      const issue = parsed.error.issues[0];
+      const detail = issue
+        ? `Field "${issue.path.join('.') || 'recipients'}": ${issue.message}`
+        : 'Invalid recipients format';
+      return NextResponse.json({ error: detail }, { status: 400 });
     }
 
     const campaign = await prisma.campaign.findFirst({ where: { id, workspaceId } });
