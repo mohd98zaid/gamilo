@@ -587,6 +587,14 @@ export default function ChannelsPage() {
                         <label className="text-xs font-semibold text-foreground-muted">
                           Meta / Provider Access Token <span className="text-foreground-subtle font-normal">(Optional)</span>
                         </label>
+                        <a
+                          href="https://developers.facebook.com/tools/explorer/"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] text-brand hover:underline flex items-center gap-1 font-semibold"
+                        >
+                          Generate Meta Token <ExternalLink className="w-3 h-3" />
+                        </a>
                       </div>
                       <input
                         type="password"
