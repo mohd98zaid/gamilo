@@ -501,154 +501,163 @@ export default function CampaignsPage() {
 
         {/* Create / Edit Campaign Modal */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-surface border border-brand/40 rounded-3xl max-w-xl w-full p-6 shadow-2xl my-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-foreground flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-brand" /> {editingCampaignId ? 'Edit Outreach Campaign' : 'New Outreach Campaign'}
-                </h3>
-                <button onClick={() => setIsModalOpen(false)} className="text-foreground-subtle hover:text-foreground text-xs">
-                  ✕
-                </button>
-              </div>
-
-              {/* AI Assistant helper */}
-              <div className="p-3.5 rounded-2xl bg-brand/5 border border-brand/20 space-y-2">
-                <div className="flex items-center gap-1.5 text-xs font-bold text-brand">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>AI Copy Generator (NVIDIA NIM)</span>
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="e.g. Cold pitch for SEO audit service to local dentists"
-                    value={aiTopic}
-                    onChange={(e) => setAiTopic(e.target.value)}
-                    className="flex-1 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAiDraft}
-                    disabled={isGeneratingAi}
-                    className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-60 text-white text-xs font-semibold flex items-center gap-1"
-                  >
-                    {isGeneratingAi ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-                    <span>Draft Email</span>
-                  </button>
-                </div>
-              </div>
-
-              <form onSubmit={handleSaveCampaign} className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-semibold text-foreground-muted mb-1">
-                    Campaign Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Q4 Growth Leads Outreach"
-                    value={campaignName}
-                    onChange={(e) => setCampaignName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground-muted mb-1">
-                    Sender Account (From)
-                  </label>
-                  <select
-                    value={selectedChannelId}
-                    onChange={(e) => setSelectedChannelId(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
-                  >
-                    {channels.length === 0 ? (
-                      <option value="">No email channel connected (connect in Channels page)</option>
-                    ) : (
-                      channels.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.platform})
-                        </option>
-                      ))
-                    )}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-foreground-muted mb-1">
-                    Email Subject Line
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Quick question regarding {{company}}'s marketing"
-                    value={subject}
-                    onChange={(e) => setSubject(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-foreground-muted">
-                      Email Body Template
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleInsertTag('{{name}}')}
-                        className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
-                        title="Insert recipient name"
-                      >
-                        + {'{{name}}'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleInsertTag('{{company}}')}
-                        className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
-                        title="Insert company name"
-                      >
-                        + {'{{company}}'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleInsertLink}
-                        className="px-2 py-0.5 rounded-lg bg-brand/10 hover:bg-brand/20 border border-brand/20 text-[10px] text-brand font-bold flex items-center gap-1 transition-colors"
-                        title="Insert clickable hyperlink"
-                      >
-                        <LinkIcon className="w-3 h-3" /> Insert Link
-                      </button>
-                    </div>
-                  </div>
-                  <textarea
-                    required
-                    rows={7}
-                    placeholder="Hi {{name}},&#10;&#10;I noticed your work at {{company}}...&#10;&#10;Connect with me:&#10;[LinkedIn](https://linkedin.com/in/...) | [GitHub](https://github.com/...)"
-                    value={body}
-                    onChange={(e) => setBody(e.target.value)}
-                    className="w-full p-3 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-sans leading-relaxed"
-                  />
-                  <div className="mt-1.5 p-2 rounded-xl bg-surface-2/60 border border-border text-[11px] text-foreground-subtle leading-normal">
-                    <span className="font-semibold text-brand">💡 How to add clickable hyperlinks:</span>
-                    <ul className="list-disc pl-4 mt-1 space-y-0.5">
-                      <li>Use markdown syntax: <code>[LinkedIn](https://linkedin.com/in/yourname)</code> or click <strong>Insert Link</strong> above.</li>
-                      <li>Or paste full raw URLs: <code>https://github.com/yourname</code> (automatically converted into clickable links).</li>
-                      <li><strong>Plain words</strong> like <code>LinkedIn</code> without a URL won't be clickable because the email client doesn't know where to link.</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-2">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              <form onSubmit={handleSaveCampaign} className="flex flex-col h-full max-h-[90vh] overflow-hidden">
+                {/* Fixed Header */}
+                <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
+                  <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-brand" /> {editingCampaignId ? 'Edit Outreach Campaign' : 'New Outreach Campaign'}
+                  </h3>
                   <button
                     type="button"
                     onClick={() => setIsModalOpen(false)}
-                    className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground"
+                    className="w-7 h-7 rounded-lg text-foreground-subtle hover:text-foreground hover:bg-surface-2 transition-colors flex items-center justify-center text-sm font-bold"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Scrollable Form Body */}
+                <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                  {/* AI Assistant helper */}
+                  <div className="p-3.5 rounded-2xl bg-brand/5 border border-brand/20 space-y-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-brand">
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>AI Copy Generator (NVIDIA NIM)</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="e.g. Cold pitch for SEO audit service to local dentists"
+                        value={aiTopic}
+                        onChange={(e) => setAiTopic(e.target.value)}
+                        className="flex-1 px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAiDraft}
+                        disabled={isGeneratingAi}
+                        className="px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-60 text-white text-xs font-semibold flex items-center gap-1 shrink-0"
+                      >
+                        {isGeneratingAi ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                        <span>Draft Email</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground-muted mb-1">
+                      Campaign Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Q4 Growth Leads Outreach"
+                      value={campaignName}
+                      onChange={(e) => setCampaignName(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground-muted mb-1">
+                      Sender Account (From)
+                    </label>
+                    <select
+                      value={selectedChannelId}
+                      onChange={(e) => setSelectedChannelId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                    >
+                      {channels.length === 0 ? (
+                        <option value="">No email channel connected (connect in Channels page)</option>
+                      ) : (
+                        channels.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.platform})
+                          </option>
+                        ))
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground-muted mb-1">
+                      Email Subject Line
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Quick question regarding {{company}}'s marketing"
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-foreground-muted">
+                        Email Body Template
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleInsertTag('{{name}}')}
+                          className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
+                          title="Insert recipient name"
+                        >
+                          + {'{{name}}'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleInsertTag('{{company}}')}
+                          className="px-2 py-0.5 rounded-lg bg-surface-2 hover:bg-surface border border-border text-[10px] font-mono text-foreground font-semibold"
+                          title="Insert company name"
+                        >
+                          + {'{{company}}'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleInsertLink}
+                          className="px-2 py-0.5 rounded-lg bg-brand/10 hover:bg-brand/20 border border-brand/20 text-[10px] text-brand font-bold flex items-center gap-1 transition-colors"
+                          title="Insert clickable hyperlink"
+                        >
+                          <LinkIcon className="w-3 h-3" /> Insert Link
+                        </button>
+                      </div>
+                    </div>
+                    <textarea
+                      required
+                      rows={5}
+                      placeholder="Hi {{name}},&#10;&#10;I noticed your work at {{company}}...&#10;&#10;Connect with me:&#10;[LinkedIn](https://linkedin.com/in/...) | [GitHub](https://github.com/...)"
+                      value={body}
+                      onChange={(e) => setBody(e.target.value)}
+                      className="w-full p-3 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-sans leading-relaxed"
+                    />
+                    <div className="mt-1.5 p-2 rounded-xl bg-surface-2/60 border border-border text-[11px] text-foreground-subtle leading-normal">
+                      <span className="font-semibold text-brand">💡 How to add clickable hyperlinks:</span>
+                      <ul className="list-disc pl-4 mt-1 space-y-0.5">
+                        <li>Use markdown syntax: <code>[LinkedIn](https://linkedin.com/in/yourname)</code> or click <strong>Insert Link</strong> above.</li>
+                        <li>Or paste full raw URLs: <code>https://github.com/yourname</code> (automatically converted into clickable links).</li>
+                        <li><strong>Plain words</strong> like <code>LinkedIn</code> without a URL won't be clickable because the email client doesn't know where to link.</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Fixed Footer */}
+                <div className="p-3 sm:p-4 px-5 border-t border-border flex items-center justify-end gap-2.5 shrink-0 bg-surface">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground hover:bg-surface-2 transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white font-bold text-xs shadow-md shadow-brand/20 transition-all"
+                    className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white font-bold text-xs shadow-md shadow-brand/20 transition-all flex items-center gap-1.5"
                   >
                     {editingCampaignId ? 'Update Campaign' : 'Save Campaign'}
                   </button>
@@ -660,11 +669,12 @@ export default function CampaignsPage() {
 
         {/* Manage Recipients Modal */}
         {isRecipientsOpen && activeCampaign && (
-          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-            <div className="bg-surface border border-brand/40 rounded-3xl max-w-2xl w-full p-6 shadow-2xl my-8 space-y-4">
-              <div className="flex items-center justify-between">
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Fixed Header */}
+              <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
                 <div>
-                  <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-foreground flex items-center gap-2">
                     <Users className="w-4 h-4 text-brand" /> Recipients for: {activeCampaign.name}
                   </h3>
                   <p className="text-xs text-foreground-muted">
@@ -672,90 +682,95 @@ export default function CampaignsPage() {
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsRecipientsOpen(false)}
-                  className="text-foreground-subtle hover:text-foreground text-xs"
+                  className="w-7 h-7 rounded-lg text-foreground-subtle hover:text-foreground hover:bg-surface-2 transition-colors flex items-center justify-center text-sm font-bold"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* Paste or Upload Box */}
-              <div className="p-4 rounded-2xl bg-surface-2/60 border border-border space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-foreground">
-                    Add Contacts (Paste CSV or Text)
-                  </label>
-                  <span className="text-[10px] text-foreground-subtle">
-                    Format: <code>email, Full Name, Company Name</code> (one per line)
-                  </span>
+              {/* Scrollable Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Paste or Upload Box */}
+                <div className="p-4 rounded-2xl bg-surface-2/60 border border-border space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-foreground">
+                      Add Contacts (Paste CSV or Text)
+                    </label>
+                    <span className="text-[10px] text-foreground-subtle">
+                      Format: <code>email, Full Name, Company Name</code> (one per line)
+                    </span>
+                  </div>
+                  <textarea
+                    rows={4}
+                    placeholder={`alex@acme.com, Alex Turner, Acme Inc&#10;sarah@designco.com, Sarah Lee, Design Co`}
+                    value={rawContactsText}
+                    onChange={(e) => setRawContactsText(e.target.value)}
+                    className="w-full p-2.5 rounded-xl bg-surface border border-border text-foreground font-mono text-xs focus:outline-none focus:border-brand"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImportRecipients}
+                    disabled={isImporting || !rawContactsText.trim()}
+                    className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all"
+                  >
+                    {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>Add Recipients to Campaign</span>
+                  </button>
                 </div>
-                <textarea
-                  rows={4}
-                  placeholder={`alex@acme.com, Alex Turner, Acme Inc&#10;sarah@designco.com, Sarah Lee, Design Co`}
-                  value={rawContactsText}
-                  onChange={(e) => setRawContactsText(e.target.value)}
-                  className="w-full p-2.5 rounded-xl bg-surface border border-border text-foreground font-mono text-xs focus:outline-none focus:border-brand"
-                />
-                <button
-                  type="button"
-                  onClick={handleImportRecipients}
-                  disabled={isImporting || !rawContactsText.trim()}
-                  className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all"
-                >
-                  {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                  <span>Add Recipients to Campaign</span>
-                </button>
-              </div>
 
-              {/* Recipients Table */}
-              <div className="max-h-60 overflow-y-auto border border-border rounded-xl">
-                <table className="w-full text-left text-xs text-foreground">
-                  <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0">
-                    <tr>
-                      <th className="p-2.5">Email</th>
-                      <th className="p-2.5">Name</th>
-                      <th className="p-2.5">Company</th>
-                      <th className="p-2.5">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/60">
-                    {recipients.length === 0 ? (
+                {/* Recipients Table */}
+                <div className="max-h-60 overflow-y-auto border border-border rounded-xl">
+                  <table className="w-full text-left text-xs text-foreground">
+                    <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0">
                       <tr>
-                        <td colSpan={4} className="p-4 text-center text-foreground-subtle text-xs">
-                          No recipients added yet. Paste a list above to populate.
-                        </td>
+                        <th className="p-2.5">Email</th>
+                        <th className="p-2.5">Name</th>
+                        <th className="p-2.5">Company</th>
+                        <th className="p-2.5">Status</th>
                       </tr>
-                    ) : (
-                      recipients.map((r) => (
-                        <tr key={r.id} className="hover:bg-surface-2/40">
-                          <td className="p-2.5 font-mono">{r.email}</td>
-                          <td className="p-2.5">{r.name || '—'}</td>
-                          <td className="p-2.5">{r.company || '—'}</td>
-                          <td className="p-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                                r.status === 'SENT'
-                                  ? 'bg-emerald-500/10 text-emerald-400'
-                                  : r.status === 'FAILED'
-                                  ? 'bg-red-500/10 text-red-400'
-                                  : 'bg-surface-2 text-foreground-subtle'
-                              }`}
-                            >
-                              {r.status}
-                            </span>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {recipients.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-4 text-center text-foreground-subtle text-xs">
+                            No recipients added yet. Paste a list above to populate.
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+                      ) : (
+                        recipients.map((r) => (
+                          <tr key={r.id} className="hover:bg-surface-2/40">
+                            <td className="p-2.5 font-mono">{r.email}</td>
+                            <td className="p-2.5">{r.name || '—'}</td>
+                            <td className="p-2.5">{r.company || '—'}</td>
+                            <td className="p-2.5">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                                  r.status === 'SENT'
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : r.status === 'FAILED'
+                                    ? 'bg-red-500/10 text-red-400'
+                                    : 'bg-surface-2 text-foreground-subtle'
+                                }`}
+                              >
+                                {r.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
-              <div className="flex justify-end gap-2 pt-2">
+              {/* Fixed Footer */}
+              <div className="p-3 sm:p-4 px-5 border-t border-border flex items-center justify-end shrink-0 bg-surface">
                 <button
                   type="button"
                   onClick={() => setIsRecipientsOpen(false)}
-                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface text-foreground font-semibold text-xs border border-border"
+                  className="px-4 py-2 rounded-xl bg-surface-2 hover:bg-surface text-foreground font-semibold text-xs border border-border transition-colors"
                 >
                   Close
                 </button>
