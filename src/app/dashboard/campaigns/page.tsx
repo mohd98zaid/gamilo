@@ -802,7 +802,7 @@ export default function CampaignsPage() {
         {/* Manage Recipients Modal */}
         {isRecipientsOpen && activeCampaign && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
-            <div className="bg-surface border border-brand/40 rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
               {/* Fixed Header */}
               <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
                 <div>
@@ -836,7 +836,7 @@ export default function CampaignsPage() {
                   </div>
                   <textarea
                     rows={4}
-                    placeholder={`alex.turner@stripe.com\nsarah_lee@airbnb.com\njobs@figma.com\nmohd98zaid@gmail.com, Mohammad Zaid`}
+                    placeholder={`alex.smith@company.com\nsarah_lee@enterprise.org\njobs@startup.io\ncontact@business.com, John Doe`}
                     value={rawContactsText}
                     onChange={(e) => setRawContactsText(e.target.value)}
                     className="w-full p-2.5 rounded-xl bg-surface border border-border text-foreground font-mono text-xs focus:outline-none focus:border-brand"
@@ -866,14 +866,14 @@ export default function CampaignsPage() {
                     )}
                   </div>
                   <p className="text-[10px] text-foreground-subtle">
-                    💡 <strong>Tip:</strong> You can paste raw email addresses alone! The system automatically infers the person&apos;s name and company (e.g. <code>alex.turner@stripe.com</code> ➔ Alex Turner @ Stripe).
+                    💡 <strong>Tip:</strong> You can paste raw email addresses alone! The system automatically infers the person&apos;s name and company (e.g. <code>alex.smith@company.com</code> ➔ Alex Smith @ Company).
                   </p>
                 </div>
 
                 {/* Filter Tabs & Search Bar */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
                   {/* Status Filter Tabs */}
-                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2/80 border border-border text-xs overflow-x-auto">
+                  <div className="flex items-center gap-1.5 p-1 rounded-xl bg-surface-2/80 border border-border text-xs overflow-x-auto shrink-0">
                     <button
                       type="button"
                       onClick={() => setRecipientFilter('ALL')}
@@ -939,15 +939,15 @@ export default function CampaignsPage() {
                 </div>
 
                 {/* Recipients Table */}
-                <div className="max-h-64 overflow-y-auto border border-border rounded-xl">
-                  <table className="w-full text-left text-xs text-foreground">
-                    <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0">
+                <div className="max-h-72 overflow-x-auto overflow-y-auto border border-border rounded-xl">
+                  <table className="min-w-[680px] w-full text-left text-xs text-foreground">
+                    <thead className="bg-surface-2 text-foreground-subtle text-[11px] uppercase tracking-wider sticky top-0 z-10">
                       <tr>
-                        <th className="p-2.5">Email</th>
-                        <th className="p-2.5">Name</th>
-                        <th className="p-2.5">Company</th>
-                        <th className="p-2.5">Status</th>
-                        <th className="p-2.5">Logs / Sent Time</th>
+                        <th className="p-3 w-[220px]">Email</th>
+                        <th className="p-3 w-[140px]">Name</th>
+                        <th className="p-3 w-[140px]">Company</th>
+                        <th className="p-3 w-[90px]">Status</th>
+                        <th className="p-3 min-w-[170px] whitespace-nowrap">Logs / Sent Time</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
@@ -962,10 +962,10 @@ export default function CampaignsPage() {
                       ) : (
                         filteredRecipients.map((r) => (
                           <tr key={r.id} className="hover:bg-surface-2/40">
-                            <td className="p-2.5 font-mono">{r.email}</td>
-                            <td className="p-2.5">{r.name || '—'}</td>
-                            <td className="p-2.5">{r.company || '—'}</td>
-                            <td className="p-2.5">
+                            <td className="p-3 font-mono">{r.email}</td>
+                            <td className="p-3">{r.name || '—'}</td>
+                            <td className="p-3">{r.company || '—'}</td>
+                            <td className="p-3">
                               <span
                                 className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
                                   r.status === 'SENT'
@@ -978,10 +978,10 @@ export default function CampaignsPage() {
                                 {r.status}
                               </span>
                             </td>
-                            <td className="p-2.5 text-[11px]">
+                            <td className="p-3 text-[11px] whitespace-nowrap">
                               {r.status === 'SENT' && (
-                                <span className="text-emerald-400 flex items-center gap-1 font-mono">
-                                  <CheckCircle2 className="w-3 h-3 shrink-0" />
+                                <span className="text-emerald-400 flex items-center gap-1.5 font-mono">
+                                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                   <span>{r.sentAt ? new Date(r.sentAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : 'Dispatched'}</span>
                                 </span>
                               )}
@@ -991,8 +991,8 @@ export default function CampaignsPage() {
                                 </span>
                               )}
                               {r.status === 'PENDING' && (
-                                <span className="text-foreground-subtle flex items-center gap-1">
-                                  <Clock className="w-3 h-3 shrink-0" />
+                                <span className="text-foreground-subtle flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 shrink-0" />
                                   <span>Queued for dispatch</span>
                                 </span>
                               )}
