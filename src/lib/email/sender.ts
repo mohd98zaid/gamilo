@@ -28,6 +28,29 @@ export interface SendBulkOptions {
 }
 
 /**
+ * Cleans a channel name into a human display name suitable for RFC 5322 From headers
+ * (e.g. "Mohammad Zaid (mohd98zaid@gmail.com)" -> "Mohammad Zaid")
+ */
+export function extractCleanSenderName(rawName?: string | null, email?: string): string {
+  if (!rawName) return email ? email.split('@')[0] : 'Sender';
+
+  // Strip parenthesized or bracketed email patterns like (user@domain.com) or <user@domain.com>
+  let cleaned = rawName.replace(/[\(\[\<].*?@.*?[\)\]\>]/g, '').trim();
+
+  // Strip trailing raw emails
+  cleaned = cleaned.replace(/\s+[^\s@]+@[^\s@]+\.[^\s@]+/g, '').trim();
+
+  // Strip surrounding quotes
+  cleaned = cleaned.replace(/^["']|["']$/g, '').trim();
+
+  if (!cleaned || cleaned.includes('@')) {
+    return email ? email.split('@')[0] : 'Sender';
+  }
+
+  return cleaned;
+}
+
+/**
  * Converts raw template text or markdown into responsive HTML email with clickable hyperlinks
  */
 export function formatEmailBodyToHtml(content: string): string {
@@ -141,10 +164,12 @@ export async function getEmailTransporter(workspaceId: string, channelId?: strin
     });
   }
 
+  const cleanSenderName = extractCleanSenderName(channel.name, userEmail);
+
   return {
     transporter,
     senderEmail: userEmail,
-    senderName: channel.name,
+    senderName: cleanSenderName,
     channel,
   };
 }
@@ -163,6 +188,7 @@ export async function sendEmail(options: SendEmailOptions) {
   const mailOptions = {
     from: `"${senderName}" <${senderEmail}>`,
     to: options.to,
+    replyTo: senderEmail,
     subject: options.subject,
     text: options.text || options.html?.replace(/<[^>]*>?/gm, '') || '',
     html: htmlBody,
@@ -208,6 +234,7 @@ export async function sendBulkEmails(options: SendBulkOptions) {
       await transporter.sendMail({
         from: `"${senderName}" <${senderEmail}>`,
         to: recipient.email,
+        replyTo: senderEmail,
         subject: personalizedSubject,
         html: personalizedHtml,
         text: plainText,

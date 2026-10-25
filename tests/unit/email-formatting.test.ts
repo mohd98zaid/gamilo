@@ -1,5 +1,20 @@
 import { describe, it, expect } from 'vitest';
-import { formatEmailBodyToHtml } from '@/lib/email/sender';
+import { formatEmailBodyToHtml, extractCleanSenderName } from '@/lib/email/sender';
+
+describe('Sender Display Name Extractor', () => {
+  it('strips parenthesized email address from channel name', () => {
+    expect(extractCleanSenderName('Mohammad Zaid (mohd98zaid@gmail.com)', 'mohd98zaid@gmail.com')).toBe('Mohammad Zaid');
+    expect(extractCleanSenderName('Zaid (mohd.zaid.cs@gmail.com)', 'mohd.zaid.cs@gmail.com')).toBe('Zaid');
+  });
+
+  it('keeps clean sender name as is', () => {
+    expect(extractCleanSenderName('Mohammad Zaid', 'mohd98zaid@gmail.com')).toBe('Mohammad Zaid');
+  });
+
+  it('falls back to username if channel name is just the email address', () => {
+    expect(extractCleanSenderName('mohd98zaid@gmail.com', 'mohd98zaid@gmail.com')).toBe('mohd98zaid');
+  });
+});
 
 describe('Email Body HTML & Hyperlink Formatter', () => {
   it('converts markdown links [Text](URL) into clickable HTML anchor tags', () => {
