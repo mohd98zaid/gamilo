@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/api-auth';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
+import { inferContactDetails } from '@/lib/email/contact-infer';
 
 const recipientItemSchema = z.object({
   email: z.string().trim().email(),
@@ -38,22 +39,25 @@ export async function POST(
     let addedCount = 0;
     for (const r of parsed.data.recipients) {
       try {
+        // Auto-detect missing Name and Company from email if not explicitly provided
+        const inferred = inferContactDetails(r.email, r.name, r.company);
+
         await prisma.campaignRecipient.upsert({
           where: {
             campaignId_email: {
               campaignId: id,
-              email: r.email.toLowerCase(),
+              email: inferred.email,
             },
           },
           update: {
-            name: r.name,
-            company: r.company,
+            name: inferred.name,
+            company: inferred.company,
           },
           create: {
             campaignId: id,
-            email: r.email.toLowerCase(),
-            name: r.name,
-            company: r.company,
+            email: inferred.email,
+            name: inferred.name,
+            company: inferred.company,
             status: 'PENDING',
           },
         });

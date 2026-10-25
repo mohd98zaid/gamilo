@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
+import { inferContactDetails } from '@/lib/email/contact-infer';
 
 interface Campaign {
   id: string;
@@ -64,6 +65,7 @@ export default function CampaignsPage() {
   const [isRecipientsOpen, setIsRecipientsOpen] = useState(false);
   const [rawContactsText, setRawContactsText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [isEnrichingAi, setIsEnrichingAi] = useState(false);
 
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
@@ -245,16 +247,14 @@ export default function CampaignsPage() {
       for (const line of lines) {
         const parts = line.split(',').map((s) => s.trim());
         if (parts[0] && parts[0].includes('@')) {
-          parsedList.push({
-            email: parts[0],
-            name: parts[1] || undefined,
-            company: parts[2] || undefined,
-          });
+          // Automatically infer Name and Company if missing!
+          const inferred = inferContactDetails(parts[0], parts[1], parts[2]);
+          parsedList.push(inferred);
         }
       }
 
       if (parsedList.length === 0) {
-        alert('No valid email addresses found. Format: email, name, company');
+        alert('No valid email addresses found.');
         setIsImporting(false);
         return;
       }
@@ -277,6 +277,27 @@ export default function CampaignsPage() {
       alert('Error importing recipients');
     } finally {
       setIsImporting(false);
+    }
+  }
+
+  async function handleAiEnrichContacts() {
+    if (!activeCampaign) return;
+    setIsEnrichingAi(true);
+    try {
+      const res = await fetch(`/api/campaigns/${activeCampaign.id}/recipients/ai-enrich`, {
+        method: 'POST',
+      });
+      const d = await res.json();
+      if (res.ok) {
+        alert(d.message || `Enriched ${d.enrichedCount} contacts with AI`);
+        handleOpenRecipients(activeCampaign);
+      } else {
+        alert(d.error || 'AI enrichment failed');
+      }
+    } catch {
+      alert('Error calling AI enrichment');
+    } finally {
+      setIsEnrichingAi(false);
     }
   }
 
@@ -753,30 +774,48 @@ export default function CampaignsPage() {
               <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
                 {/* Paste or Upload Box */}
                 <div className="p-4 rounded-2xl bg-surface-2/60 border border-border space-y-2.5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                     <label className="text-xs font-bold text-foreground">
-                      Add Contacts (Paste CSV or Text)
+                      Add Contacts (Paste Emails or CSV)
                     </label>
-                    <span className="text-[10px] text-foreground-subtle">
-                      Format: <code>email, Full Name, Company Name</code> (one per line)
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Auto-detects Name & Company if missing
                     </span>
                   </div>
                   <textarea
                     rows={4}
-                    placeholder={`alex@acme.com, Alex Turner, Acme Inc&#10;sarah@designco.com, Sarah Lee, Design Co`}
+                    placeholder={`alex.turner@stripe.com\nsarah_lee@airbnb.com\njobs@figma.com\nmohd98zaid@gmail.com, Mohammad Zaid`}
                     value={rawContactsText}
                     onChange={(e) => setRawContactsText(e.target.value)}
                     className="w-full p-2.5 rounded-xl bg-surface border border-border text-foreground font-mono text-xs focus:outline-none focus:border-brand"
                   />
-                  <button
-                    type="button"
-                    onClick={handleImportRecipients}
-                    disabled={isImporting || !rawContactsText.trim()}
-                    className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all"
-                  >
-                    {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
-                    <span>Add Recipients to Campaign</span>
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={handleImportRecipients}
+                      disabled={isImporting || !rawContactsText.trim()}
+                      className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-brand/20"
+                    >
+                      {isImporting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                      <span>Add & Auto-Detect Contacts</span>
+                    </button>
+
+                    {recipients.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleAiEnrichContacts}
+                        disabled={isEnrichingAi}
+                        className="px-3.5 py-2 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 border border-purple-500/20 text-xs font-bold flex items-center gap-1.5 transition-all"
+                        title="Use NVIDIA NIM AI to refine ambiguous names and companies"
+                      >
+                        {isEnrichingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        <span>AI Refine Names</span>
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-foreground-subtle">
+                    💡 <strong>Tip:</strong> You can paste raw email addresses alone! The system automatically infers the person&apos;s name and company (e.g. <code>alex.turner@stripe.com</code> ➔ Alex Turner @ Stripe).
+                  </p>
                 </div>
 
                 {/* Recipients Table */}
