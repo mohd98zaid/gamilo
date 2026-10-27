@@ -19,6 +19,7 @@ import {
   Shuffle,
   ShieldCheck,
   Search,
+  Copy,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 import { inferContactDetails } from '@/lib/email/contact-infer';
@@ -73,9 +74,23 @@ export default function CampaignsPage() {
 
   // Send status
   const [isSending, setIsSending] = useState<string | null>(null);
+  const [isResendingAll, setIsResendingAll] = useState<string | null>(null);
   const [isRetryingFailed, setIsRetryingFailed] = useState<string | null>(null);
   const [isRetryingSingle, setIsRetryingSingle] = useState<string | null>(null);
+  const [isRemovingRecipient, setIsRemovingRecipient] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
+
+  // Duplicate Campaign State
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [campaignToDuplicate, setCampaignToDuplicate] = useState<Campaign | null>(null);
+  const [duplicateName, setDuplicateName] = useState('');
+  const [duplicateWhat, setDuplicateWhat] = useState<'BOTH' | 'EMAIL_ONLY' | 'RECIPIENTS_ONLY'>('BOTH');
+  const [isDuplicating, setIsDuplicating] = useState(false);
+
+  // Source campaign copy in Create Modal
+  const [selectedSourceCampaignId, setSelectedSourceCampaignId] = useState('');
+  const [copyEmailOnCreate, setCopyEmailOnCreate] = useState(true);
+  const [copyRecipientsOnCreate, setCopyRecipientsOnCreate] = useState(false);
 
   function handleOpenCreate() {
     setEditingCampaignId(null);
@@ -83,8 +98,81 @@ export default function CampaignsPage() {
     setSubject('');
     setBody('');
     setAiTopic('');
+    setSelectedSourceCampaignId('');
+    setCopyEmailOnCreate(true);
+    setCopyRecipientsOnCreate(false);
     if (channels.length > 0) setSelectedChannelId(channels[0].id);
     setIsModalOpen(true);
+  }
+
+  function handleOpenDuplicate(camp: Campaign) {
+    setCampaignToDuplicate(camp);
+    setDuplicateName(`${camp.name} (Copy)`);
+    setDuplicateWhat('BOTH');
+    setIsDuplicateModalOpen(true);
+  }
+
+  async function handleConfirmDuplicate() {
+    if (!campaignToDuplicate || !duplicateName.trim()) return;
+    setIsDuplicating(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignToDuplicate.id}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: duplicateName.trim(),
+          copyEmail: duplicateWhat === 'BOTH' || duplicateWhat === 'EMAIL_ONLY',
+          copyRecipients: duplicateWhat === 'BOTH' || duplicateWhat === 'RECIPIENTS_ONLY',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsDuplicateModalOpen(false);
+        setCampaignToDuplicate(null);
+        await loadData();
+        setSendFeedback(`Campaign "${duplicateName.trim()}" created successfully!`);
+      } else {
+        alert(data.error || 'Failed to duplicate campaign');
+      }
+    } catch {
+      alert('Network error while duplicating campaign');
+    } finally {
+      setIsDuplicating(false);
+    }
+  }
+
+  function handleSelectSourceCampaign(sourceId: string) {
+    setSelectedSourceCampaignId(sourceId);
+    if (!sourceId) {
+      setCampaignName('');
+      setSubject('');
+      setBody('');
+      setCopyRecipientsOnCreate(false);
+      return;
+    }
+    const src = campaigns.find((c) => c.id === sourceId);
+    if (!src) return;
+    setCampaignName(`${src.name} (Copy)`);
+    setSubject(src.subject);
+    setBody(src.body || '');
+    if (src.fromChannelId) setSelectedChannelId(src.fromChannelId);
+    setCopyEmailOnCreate(true);
+    setCopyRecipientsOnCreate(src.totalRecipients > 0);
+  }
+
+  function handleToggleCopyEmail(checked: boolean) {
+    setCopyEmailOnCreate(checked);
+    if (!selectedSourceCampaignId) return;
+    const src = campaigns.find((c) => c.id === selectedSourceCampaignId);
+    if (!src) return;
+    if (checked) {
+      setSubject(src.subject);
+      setBody(src.body || '');
+      if (src.fromChannelId) setSelectedChannelId(src.fromChannelId);
+    } else {
+      setSubject('');
+      setBody('');
+    }
   }
 
   function handleOpenEdit(camp: Campaign) {
@@ -144,7 +232,9 @@ export default function CampaignsPage() {
   }
 
   useEffect(() => {
+    // loadData is an intentionally stable page bootstrap action.
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function loadData() {
@@ -200,15 +290,30 @@ export default function CampaignsPage() {
           alert(`Failed to update campaign: ${err.error || 'Unknown error'}`);
         }
       } else {
-        const res = await fetch('/api/campaigns', {
+        const endpoint = selectedSourceCampaignId && copyRecipientsOnCreate
+          ? `/api/campaigns/${selectedSourceCampaignId}/duplicate`
+          : '/api/campaigns';
+
+        const payload = selectedSourceCampaignId && copyRecipientsOnCreate
+          ? {
+              name: campaignName,
+              subject,
+              body,
+              fromChannelId: selectedChannelId || undefined,
+              copyEmail: true,
+              copyRecipients: true,
+            }
+          : {
+              name: campaignName,
+              subject,
+              body,
+              fromChannelId: selectedChannelId || undefined,
+            };
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: campaignName,
-            subject,
-            body,
-            fromChannelId: selectedChannelId || undefined,
-          }),
+          body: JSON.stringify(payload),
         });
 
         if (res.ok) {
@@ -217,6 +322,8 @@ export default function CampaignsPage() {
           setSubject('');
           setBody('');
           setAiTopic('');
+          setSelectedSourceCampaignId('');
+          setCopyRecipientsOnCreate(false);
           loadData();
         } else {
           const err = await res.json();
@@ -363,6 +470,33 @@ export default function CampaignsPage() {
     }
   }
 
+  async function handleResendAll(camp: Campaign) {
+    if (camp.totalSent === 0) return;
+    if (!confirm(`Resend this campaign to all ${camp.totalRecipients} recipients, including recipients already marked sent?`)) return;
+    setIsResendingAll(camp.id);
+    setSendFeedback(null);
+
+    try {
+      const res = await fetch(`/api/campaigns/${camp.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resendAll: true }),
+      });
+      const d = await res.json();
+      if (res.ok) {
+        setSendFeedback(`Campaign resent. Dispatched: ${d.sent}, Failed: ${d.failed}`);
+        if (activeCampaign?.id === camp.id) await handleOpenRecipients(camp);
+        await loadData();
+      } else {
+        alert(`Resend failed: ${d.error || 'Check channel connection'}`);
+      }
+    } catch {
+      alert('Network error while resending campaign');
+    } finally {
+      setIsResendingAll(null);
+    }
+  }
+
   async function handleRetryFailedCampaign(campId: string) {
     setIsRetryingFailed(campId);
     try {
@@ -405,6 +539,28 @@ export default function CampaignsPage() {
       alert('Network error while dispatching email');
     } finally {
       setIsRetryingSingle(null);
+    }
+  }
+
+  async function handleRemoveRecipient(recipient: Recipient) {
+    if (!activeCampaign) return;
+    if (!confirm(`Remove ${recipient.email} from this campaign?`)) return;
+    setIsRemovingRecipient(recipient.id);
+    try {
+      const res = await fetch(`/api/campaigns/${activeCampaign.id}/recipients?recipientId=${encodeURIComponent(recipient.id)}`, {
+        method: 'DELETE',
+      });
+      const d = await res.json();
+      if (res.ok) {
+        await handleOpenRecipients(activeCampaign);
+        await loadData();
+      } else {
+        alert(d.error || 'Failed to remove recipient');
+      }
+    } catch {
+      alert('Error removing recipient');
+    } finally {
+      setIsRemovingRecipient(null);
     }
   }
 
@@ -620,6 +776,15 @@ export default function CampaignsPage() {
                   </button>
 
                   <button
+                    onClick={() => handleOpenDuplicate(camp)}
+                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
+                    title="Duplicate Campaign"
+                  >
+                    <Copy className="w-3.5 h-3.5 text-foreground-muted" />
+                    <span>Duplicate</span>
+                  </button>
+
+                  <button
                     onClick={() => handleOpenRecipients(camp)}
                     className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
                   >
@@ -636,6 +801,18 @@ export default function CampaignsPage() {
                     >
                       <RefreshCw className={`w-3.5 h-3.5 ${isRetryingFailed === camp.id ? 'animate-spin' : ''}`} />
                       <span>Retry Failed ({camp.totalFailed})</span>
+                    </button>
+                  )}
+
+                  {camp.totalSent > 0 && (
+                    <button
+                      onClick={() => handleResendAll(camp)}
+                      disabled={isResendingAll === camp.id}
+                      className="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
+                      title="Resend this campaign to every recipient, including recipients already sent"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isResendingAll === camp.id ? 'animate-spin' : ''}`} />
+                      <span>{isResendingAll === camp.id ? 'Resending...' : 'Resend All'}</span>
                     </button>
                   )}
 
@@ -686,6 +863,65 @@ export default function CampaignsPage() {
 
                 {/* Scrollable Form Body */}
                 <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                  {/* Duplicate from existing campaign option */}
+                  {!editingCampaignId && campaigns.length > 0 && (
+                    <div className="p-3.5 rounded-2xl bg-surface-2/80 border border-border space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+                          <Copy className="w-3.5 h-3.5 text-brand" />
+                          <span>Duplicate from Existing Campaign</span>
+                        </div>
+                        {selectedSourceCampaignId && (
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSourceCampaign('')}
+                            className="text-[11px] text-foreground-subtle hover:text-foreground font-semibold"
+                          >
+                            Reset to Blank
+                          </button>
+                        )}
+                      </div>
+
+                      <select
+                        value={selectedSourceCampaignId}
+                        onChange={(e) => handleSelectSourceCampaign(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-surface border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                      >
+                        <option value="">Start from scratch (blank campaign)</option>
+                        {campaigns.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.totalRecipients} recipients)
+                          </option>
+                        ))}
+                      </select>
+
+                      {selectedSourceCampaignId && (
+                        <div className="p-2.5 rounded-xl bg-surface border border-border/80 flex flex-col sm:flex-row gap-3 text-xs">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={copyEmailOnCreate}
+                              onChange={(e) => handleToggleCopyEmail(e.target.checked)}
+                              className="rounded border-border text-brand focus:ring-brand w-4 h-4"
+                            />
+                            <span className="font-medium text-foreground">Copy Email (Subject & Body)</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={copyRecipientsOnCreate}
+                              onChange={(e) => setCopyRecipientsOnCreate(e.target.checked)}
+                              className="rounded border-border text-brand focus:ring-brand w-4 h-4"
+                            />
+                            <span className="font-medium text-foreground">
+                              Copy Recipients ({campaigns.find((c) => c.id === selectedSourceCampaignId)?.totalRecipients || 0} contacts)
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* AI Assistant helper */}
                   <div className="p-3.5 rounded-2xl bg-brand/5 border border-brand/20 space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-brand">
@@ -858,6 +1094,160 @@ export default function CampaignsPage() {
           </div>
         )}
 
+        {/* Duplicate Campaign Modal */}
+        {isDuplicateModalOpen && campaignToDuplicate && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand">
+                    <Copy className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">Duplicate Campaign</h3>
+                    <p className="text-xs text-foreground-subtle">
+                      Clone &quot;{campaignToDuplicate.name}&quot; with 1 click
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsDuplicateModalOpen(false)}
+                  className="text-foreground-subtle hover:text-foreground text-sm p-1.5 rounded-xl hover:bg-surface-2 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+                    New Campaign Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={duplicateName}
+                    onChange={(e) => setDuplicateName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-medium"
+                    placeholder="e.g. Mohammad Zaid (Batch 2)"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-2">
+                    What would you like to copy?
+                  </label>
+                  <div className="space-y-2">
+                    <label
+                      onClick={() => setDuplicateWhat('BOTH')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        duplicateWhat === 'BOTH'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="duplicateWhat"
+                        value="BOTH"
+                        checked={duplicateWhat === 'BOTH'}
+                        onChange={() => setDuplicateWhat('BOTH')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-foreground block">
+                          Both: Email & Recipients
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Clones the subject line, email template, sender account, and all {campaignToDuplicate.totalRecipients} contacts as fresh pending recipients.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => setDuplicateWhat('EMAIL_ONLY')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        duplicateWhat === 'EMAIL_ONLY'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="duplicateWhat"
+                        value="EMAIL_ONLY"
+                        checked={duplicateWhat === 'EMAIL_ONLY'}
+                        onChange={() => setDuplicateWhat('EMAIL_ONLY')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-foreground block">
+                          Email Content Only
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Copies subject line, email template, and sender account. Recipients list starts empty (0 contacts) so you can add new contacts.
+                        </span>
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => setDuplicateWhat('RECIPIENTS_ONLY')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        duplicateWhat === 'RECIPIENTS_ONLY'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="duplicateWhat"
+                        value="RECIPIENTS_ONLY"
+                        checked={duplicateWhat === 'RECIPIENTS_ONLY'}
+                        onChange={() => setDuplicateWhat('RECIPIENTS_ONLY')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs">
+                        <span className="font-bold text-foreground block">
+                          Recipients Only
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Clones all {campaignToDuplicate.totalRecipients} contacts as fresh pending recipients. Subject and body remain blank for a brand new pitch.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 sm:p-4 px-5 border-t border-border flex items-center justify-end gap-2.5 shrink-0 bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setIsDuplicateModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmDuplicate}
+                  disabled={isDuplicating || !duplicateName.trim()}
+                  className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-brand/20 transition-all"
+                >
+                  {isDuplicating ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Copy className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isDuplicating ? 'Duplicating...' : 'Duplicate Campaign'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Manage Recipients Modal */}
         {isRecipientsOpen && activeCampaign && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
@@ -968,7 +1358,7 @@ export default function CampaignsPage() {
                       <Clock className="w-3 h-3" />
                       <span>Pending ({countPending})</span>
                     </button>
-                    {countFailed > 0 && (
+                     {countFailed > 0 && (
                       <>
                         <button
                           type="button"
@@ -993,6 +1383,19 @@ export default function CampaignsPage() {
                           <span>Retry Failed ({countFailed})</span>
                         </button>
                       </>
+                    )}
+
+                    {countSent > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleResendAll(activeCampaign)}
+                        disabled={isResendingAll === activeCampaign.id}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border border-purple-500/30 transition-all shrink-0 disabled:opacity-50"
+                        title="Resend this campaign to every recipient"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${isResendingAll === activeCampaign.id ? 'animate-spin' : ''}`} />
+                        <span>{isResendingAll === activeCampaign.id ? 'Resending...' : 'Resend All'}</span>
+                      </button>
                     )}
                   </div>
 
@@ -1070,7 +1473,7 @@ export default function CampaignsPage() {
                               )}
                             </td>
                             <td className="p-3 text-right whitespace-nowrap">
-                              <button
+                               <button
                                 type="button"
                                 onClick={() => handleRetrySingleRecipient(r.id)}
                                 disabled={isRetryingSingle === r.id}
@@ -1090,9 +1493,18 @@ export default function CampaignsPage() {
                                 }
                               >
                                 <RefreshCw className={`w-3 h-3 ${isRetryingSingle === r.id ? 'animate-spin' : ''}`} />
-                                <span>{r.status === 'FAILED' ? 'Retry' : r.status === 'PENDING' ? 'Send' : 'Resend'}</span>
-                              </button>
-                            </td>
+                                 <span>{r.status === 'FAILED' ? 'Retry' : r.status === 'PENDING' ? 'Send' : 'Resend'}</span>
+                               </button>
+                               <button
+                                 type="button"
+                                 onClick={() => handleRemoveRecipient(r)}
+                                 disabled={isRemovingRecipient === r.id}
+                                 className="p-1.5 rounded-lg text-foreground-subtle hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all disabled:opacity-50"
+                                 title="Remove recipient from campaign"
+                               >
+                                 <Trash2 className={`w-3.5 h-3.5 ${isRemovingRecipient === r.id ? 'animate-pulse' : ''}`} />
+                               </button>
+                             </td>
                           </tr>
                         ))
                       )}

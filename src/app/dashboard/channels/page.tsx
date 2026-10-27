@@ -49,6 +49,8 @@ export default function ChannelsPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('error') === 'google_oauth_not_configured') {
+        // URL query parameters are external state synchronized after mount.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setOauthError(
           'Google Cloud OAuth is not configured in your .env file (missing GOOGLE_CLIENT_ID or GOOGLE_REDIRECT_URI). You can connect your Gmail account instantly using your 16-character Google App Password below!'
         );

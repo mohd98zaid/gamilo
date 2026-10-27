@@ -16,6 +16,7 @@ export default function BillingPage() {
   const [data, setData] = useState<any>(null);
   const [upgrading, setUpgrading] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     fetch('/api/billing/subscription')
@@ -27,6 +28,7 @@ export default function BillingPage() {
   async function handleUpgrade(planId: string) {
     setUpgrading(true);
     setMessage('');
+    setError('');
     try {
       const res = await fetch('/api/billing/checkout', {
         method: 'POST',
@@ -39,9 +41,11 @@ export default function BillingPage() {
         // Refresh subscription
         const refreshed = await fetch('/api/billing/subscription').then((r) => r.json());
         setData(refreshed);
+      } else {
+        setError(d.error || 'Billing checkout is not available yet.');
       }
     } catch {
-      alert('Upgrade error');
+      setError('Billing checkout could not be started.');
     } finally {
       setUpgrading(false);
     }
@@ -64,6 +68,11 @@ export default function BillingPage() {
         {message && (
           <div className="p-4 rounded-2xl bg-brand/10 border border-brand/30 text-brand text-xs font-semibold flex items-center gap-2">
             <Check className="w-4 h-4" /> {message}
+          </div>
+        )}
+        {error && (
+          <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 text-xs font-semibold flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" /> {error}
           </div>
         )}
 

@@ -178,15 +178,21 @@ export async function getEmailTransporter(workspaceId: string, channelId?: strin
     throw new Error('No active Gmail or Email channel connected for this workspace');
   }
 
-  let plainPassword = '';
-  try {
-    if (channel.accessToken.startsWith('enc:v1:')) {
+  let plainPassword: string;
+  if (channel.accessToken.startsWith('enc:v1:')) {
+    try {
       plainPassword = decryptFromString(channel.accessToken);
-    } else {
-      plainPassword = channel.accessToken;
+    } catch {
+      throw new Error('Stored email credential could not be decrypted');
     }
-  } catch {
+  } else {
+    // Keep supporting legacy plaintext records so existing local data can be
+    // migrated deliberately; malformed encrypted records must fail closed.
     plainPassword = channel.accessToken;
+  }
+
+  if (!plainPassword.trim()) {
+    throw new Error('Stored email credential is empty');
   }
 
   const cleanPass = plainPassword.replace(/\s+/g, '');

@@ -121,3 +121,48 @@ export async function PATCH(
     return NextResponse.json({ error: 'Failed to reset recipients' }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> | { id: string } }
+) {
+  const { id } = await params;
+  const auth = await requireApiAuth('EDITOR');
+  if (auth instanceof NextResponse) return auth;
+
+  const workspaceId = auth?.workspaceId ?? 'default-workspace';
+  const recipientId = new URL(req.url).searchParams.get('recipientId');
+  if (!recipientId) {
+    return NextResponse.json({ error: 'recipientId is required' }, { status: 400 });
+  }
+
+  try {
+    const campaign = await prisma.campaign.findFirst({ where: { id, workspaceId } });
+    if (!campaign) {
+      return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
+    }
+
+    const recipient = await prisma.campaignRecipient.findFirst({
+      where: { id: recipientId, campaignId: id },
+      select: { id: true, status: true },
+    });
+    if (!recipient) {
+      return NextResponse.json({ error: 'Recipient not found' }, { status: 404 });
+    }
+
+    await prisma.$transaction([
+      prisma.campaignRecipient.delete({ where: { id: recipient.id } }),
+      prisma.campaign.update({
+        where: { id },
+        data: {
+          ...(recipient.status === 'SENT' ? { totalSent: Math.max(0, campaign.totalSent - 1) } : {}),
+          ...(recipient.status === 'FAILED' ? { totalFailed: Math.max(0, campaign.totalFailed - 1) } : {}),
+        },
+      }),
+    ]);
+
+    return NextResponse.json({ success: true, message: 'Recipient removed from campaign' });
+  } catch {
+    return NextResponse.json({ error: 'Failed to remove recipient' }, { status: 500 });
+  }
+}

@@ -15,11 +15,17 @@ export async function POST(
 
   try {
     let recipientId: string | undefined;
+    let resendAll = false;
     try {
       const body = await req.json();
       recipientId = body?.recipientId;
+      resendAll = body?.resendAll === true;
     } catch {
       // empty body, full campaign dispatch
+    }
+
+    if (recipientId && resendAll) {
+      return NextResponse.json({ error: 'Choose either one recipient or resend all recipients' }, { status: 400 });
     }
 
     const campaign = await prisma.campaign.findFirst({
@@ -27,7 +33,9 @@ export async function POST(
       include: {
         recipients: recipientId
           ? { where: { id: recipientId } }
-          : { where: { status: 'PENDING' } },
+          : resendAll
+            ? true
+            : { where: { status: 'PENDING' } },
       },
     });
 
@@ -51,7 +59,7 @@ export async function POST(
 
     const wasFailed = recipientId ? campaign.recipients[0]?.status === 'FAILED' : false;
 
-    // Mark as SENDING for full campaign run
+    // Mark as SENDING for a full campaign run, including an explicit resend-all.
     if (!recipientId) {
       await prisma.campaign.update({
         where: { id },
@@ -99,6 +107,11 @@ export async function POST(
       } else if (dispatchResult.failed > 0 && !wasFailed) {
         updateData.totalFailed = { increment: 1 };
       }
+    } else if (resendAll) {
+      updateData.status = 'COMPLETED';
+      updateData.completedAt = new Date();
+      updateData.totalSent = { increment: dispatchResult.sent };
+      updateData.totalFailed = dispatchResult.failed;
     } else {
       updateData.status = 'COMPLETED';
       updateData.completedAt = new Date();

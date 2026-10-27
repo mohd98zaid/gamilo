@@ -139,7 +139,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
         const res = await publishPost(req, { params: { id: createdPostId } });
         expect(res.status).toBe(501);
         const data = await res.json();
-        expect(data.error).toContain('not configured');
+        expect(data.error).toContain('not available');
       } finally {
         if (prev !== undefined) {
           process.env.ENABLE_SIMULATED_PUBLISHING = prev;
@@ -235,7 +235,7 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       expect(data.plans).toBeInstanceOf(Array);
     });
 
-    it('upgrades subscription tier and adds quota', async () => {
+    it('does not grant subscription quota without a payment provider', async () => {
       const req = new Request('http://localhost:3000/api/billing/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -243,10 +243,9 @@ describe('Comprehensive End-to-End API Integration Suite', () => {
       });
 
       const res = await postCheckout(req);
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(501);
       const data = await res.json();
-      expect(data.success).toBe(true);
-      expect(data.plan).toBe('SCALE');
+      expect(data.error).toContain('No payment was processed');
     });
   });
 

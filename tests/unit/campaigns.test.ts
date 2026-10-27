@@ -13,6 +13,16 @@ const mocks = vi.hoisted(() => ({
     campaignRecipient: {
       upsert: vi.fn(),
       updateMany: vi.fn(),
+      findFirst: vi.fn(),
+      delete: vi.fn(),
+      createMany: vi.fn(),
+      create: vi.fn(),
+    },
+    thread: {
+      findUnique: vi.fn(),
+    },
+    message: {
+      create: vi.fn(),
     },
     post: {
       findFirst: vi.fn(),
@@ -24,15 +34,17 @@ const mocks = vi.hoisted(() => ({
     subscription: {
       upsert: vi.fn(),
     },
-    workspace: {
-      update: vi.fn(),
-    },
+      workspace: {
+        update: vi.fn(),
+      },
+      $transaction: vi.fn(),
   },
 }));
 
 vi.mock('@/lib/api-auth', () => ({ requireApiAuth: mocks.requireApiAuth }));
 vi.mock('@/lib/prisma', () => ({ prisma: mocks.prisma }));
 vi.mock('@/lib/email/sender', () => ({
+  sendEmail: vi.fn(),
   sendBulkEmails: vi.fn().mockResolvedValue({
     total: 2,
     sent: 2,
@@ -45,10 +57,12 @@ vi.mock('@/lib/email/sender', () => ({
 }));
 
 import { GET as getCampaigns, POST as createCampaign } from '@/app/api/campaigns/route';
-import { POST as addRecipients, PATCH as retryRecipients } from '@/app/api/campaigns/[id]/recipients/route';
+import { POST as addRecipients, PATCH as retryRecipients, DELETE as removeRecipient } from '@/app/api/campaigns/[id]/recipients/route';
+import { POST as duplicateCampaign } from '@/app/api/campaigns/[id]/duplicate/route';
 import { POST as sendCampaign } from '@/app/api/campaigns/[id]/send/route';
 import { POST as publishPost } from '@/app/api/posts/[id]/publish/route';
 import { POST as checkoutBilling } from '@/app/api/billing/checkout/route';
+import { POST as replyToThread } from '@/app/api/inbox/threads/[id]/reply/route';
 
 const adminUser = {
   id: 'admin-1',
@@ -235,40 +249,204 @@ describe('Campaigns & Publishing & Billing Suite', () => {
     expect(mocks.prisma.campaignRecipient.updateMany).toHaveBeenCalled();
   });
 
-  it('publishes a post and records metrics when publishing is enabled', async () => {
-    process.env.ENABLE_SIMULATED_PUBLISHING = 'true';
-    mocks.prisma.post.findFirst.mockResolvedValue({
-      id: 'post-1',
+  it('resends a campaign to all recipients when explicitly requested', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
       workspaceId: 'workspace-main',
+      subject: 'Hello {{name}}',
+      body: 'Resend this message',
+      fromChannelId: 'ch-1',
+      recipients: [
+        { id: 'rec-1', email: 'a@test.com', status: 'SENT' },
+        { id: 'rec-2', email: 'b@test.com', status: 'FAILED' },
+      ],
+    });
+    mocks.prisma.campaign.update.mockResolvedValue({ id: 'camp-1', status: 'COMPLETED' });
+
+    const res = await sendCampaign(
+      new Request('http://localhost:3000/api/campaigns/camp-1/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resendAll: true }),
+      }),
+      { params: Promise.resolve({ id: 'camp-1' }) },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.prisma.campaign.findFirst).toHaveBeenCalledWith(expect.objectContaining({
+      include: { recipients: true },
+    }));
+  });
+
+  it('removes a recipient only from its workspace campaign', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      totalSent: 2,
+      totalFailed: 0,
+    });
+    mocks.prisma.campaignRecipient.findFirst.mockResolvedValue({ id: 'rec-1', status: 'SENT' });
+    mocks.prisma.$transaction.mockResolvedValue([]);
+
+    const res = await removeRecipient(
+      new Request('http://localhost:3000/api/campaigns/camp-1/recipients?recipientId=rec-1', { method: 'DELETE' }),
+      { params: Promise.resolve({ id: 'camp-1' }) },
+    );
+
+    expect(res.status).toBe(200);
+    expect(mocks.prisma.$transaction).toHaveBeenCalled();
+    expect(mocks.prisma.campaignRecipient.delete).toHaveBeenCalledWith({ where: { id: 'rec-1' } });
+  });
+
+  it('duplicates a campaign with both email content and recipients', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      name: 'Mohammad Zaid',
+      subject: 'Agentic AI Engineer pitch',
+      body: 'Hi {{name}}, I have 5.7 years...',
+      fromChannelId: 'ch-1',
+      recipients: [
+        { id: 'rec-1', email: 'alice@company.com', name: 'Alice', company: 'Acme' },
+        { id: 'rec-2', email: 'bob@enterprise.org', name: 'Bob', company: 'Enterprise' },
+      ],
+    });
+    mocks.prisma.campaign.create.mockResolvedValue({
+      id: 'camp-copy-1',
+      workspaceId: 'workspace-main',
+      name: 'Mohammad Zaid (Batch 2)',
+      subject: 'Agentic AI Engineer pitch',
+      body: 'Hi {{name}}, I have 5.7 years...',
+      fromChannelId: 'ch-1',
+      type: 'EMAIL',
       status: 'DRAFT',
-      channels: [{ channelId: 'ch-1' }],
-      metrics: [],
     });
-    mocks.prisma.post.update.mockResolvedValue({
-      id: 'post-1',
-      status: 'PUBLISHED',
-      channels: [{ channelId: 'ch-1' }],
-      metrics: [],
+    mocks.prisma.campaignRecipient.createMany.mockResolvedValue({ count: 2 });
+
+    const req = new Request('http://localhost:3000/api/campaigns/camp-1/duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Mohammad Zaid (Batch 2)',
+        copyEmail: true,
+        copyRecipients: true,
+      }),
     });
+
+    const res = await duplicateCampaign(req, { params: Promise.resolve({ id: 'camp-1' }) });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.campaign.name).toBe('Mohammad Zaid (Batch 2)');
+    expect(data.recipientsCopied).toBe(2);
+    expect(mocks.prisma.campaignRecipient.createMany).toHaveBeenCalledWith({
+      data: [
+        { campaignId: 'camp-copy-1', email: 'alice@company.com', name: 'Alice', company: 'Acme', status: 'PENDING' },
+        { campaignId: 'camp-copy-1', email: 'bob@enterprise.org', name: 'Bob', company: 'Enterprise', status: 'PENDING' },
+      ],
+    });
+  });
+
+  it('duplicates a campaign with email content only', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      name: 'Mohammad Zaid',
+      subject: 'Agentic AI Engineer pitch',
+      body: 'Hi {{name}}, I have 5.7 years...',
+      fromChannelId: 'ch-1',
+      recipients: [
+        { id: 'rec-1', email: 'alice@company.com', name: 'Alice', company: 'Acme' },
+      ],
+    });
+    mocks.prisma.campaign.create.mockResolvedValue({
+      id: 'camp-copy-2',
+      workspaceId: 'workspace-main',
+      name: 'Mohammad Zaid (Email Only)',
+      subject: 'Agentic AI Engineer pitch',
+      body: 'Hi {{name}}, I have 5.7 years...',
+      fromChannelId: 'ch-1',
+      type: 'EMAIL',
+      status: 'DRAFT',
+    });
+
+    const req = new Request('http://localhost:3000/api/campaigns/camp-1/duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'Mohammad Zaid (Email Only)',
+        copyEmail: true,
+        copyRecipients: false,
+      }),
+    });
+
+    const res = await duplicateCampaign(req, { params: Promise.resolve({ id: 'camp-1' }) });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.recipientsCopied).toBe(0);
+    expect(mocks.prisma.campaignRecipient.createMany).not.toHaveBeenCalled();
+  });
+
+  it('duplicates a campaign with recipients only', async () => {
+    mocks.prisma.campaign.findFirst.mockResolvedValue({
+      id: 'camp-1',
+      workspaceId: 'workspace-main',
+      name: 'Mohammad Zaid',
+      subject: 'Old Pitch',
+      body: 'Old Body',
+      fromChannelId: 'ch-1',
+      recipients: [
+        { id: 'rec-1', email: 'alice@company.com', name: 'Alice', company: 'Acme' },
+      ],
+    });
+    mocks.prisma.campaign.create.mockResolvedValue({
+      id: 'camp-copy-3',
+      workspaceId: 'workspace-main',
+      name: 'New Pitch to Same Contacts',
+      subject: 'Subject - New Pitch to Same Contacts',
+      body: 'Hi {{name}},\n\n...',
+      fromChannelId: undefined,
+      type: 'EMAIL',
+      status: 'DRAFT',
+    });
+    mocks.prisma.campaignRecipient.createMany.mockResolvedValue({ count: 1 });
+
+    const req = new Request('http://localhost:3000/api/campaigns/camp-1/duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: 'New Pitch to Same Contacts',
+        copyEmail: false,
+        copyRecipients: true,
+      }),
+    });
+
+    const res = await duplicateCampaign(req, { params: Promise.resolve({ id: 'camp-1' }) });
+    expect(res.status).toBe(201);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.recipientsCopied).toBe(1);
+    expect(mocks.prisma.campaignRecipient.createMany).toHaveBeenCalled();
+  });
+
+  it('does not claim social publication when only a simulation flag is enabled', async () => {
+    process.env.ENABLE_SIMULATED_PUBLISHING = 'true';
 
     const req = new Request('http://localhost:3000/api/posts/post-1/publish', {
       method: 'POST',
     });
 
     const res = await publishPost(req, { params: Promise.resolve({ id: 'post-1' }) });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(501);
     const data = await res.json();
-    expect(data.success).toBe(true);
-    expect(mocks.prisma.postMetric.create).toHaveBeenCalled();
+    expect(data.error).toContain('not available');
+    expect(mocks.prisma.post.update).not.toHaveBeenCalled();
+    expect(mocks.prisma.postMetric.create).not.toHaveBeenCalled();
     delete process.env.ENABLE_SIMULATED_PUBLISHING;
   });
 
-  it('upgrades billing plan and awards credits', async () => {
-    mocks.prisma.workspace.update.mockResolvedValue({
-      id: 'workspace-main',
-      aiCredits: 3500,
-    });
-
+  it('does not grant billing entitlements without a payment provider', async () => {
     const req = new Request('http://localhost:3000/api/billing/checkout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -276,9 +454,35 @@ describe('Campaigns & Publishing & Billing Suite', () => {
     });
 
     const res = await checkoutBilling(req);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(501);
     const data = await res.json();
-    expect(data.plan).toBe('SCALE');
-    expect(mocks.prisma.subscription.upsert).toHaveBeenCalled();
+    expect(data.error).toContain('No payment was processed');
+    expect(mocks.prisma.subscription.upsert).not.toHaveBeenCalled();
+    expect(mocks.prisma.workspace.update).not.toHaveBeenCalled();
+  });
+
+  it('does not record an inbox reply when SMTP delivery fails', async () => {
+    mocks.prisma.thread.findUnique.mockResolvedValue({
+      id: 'thread-email',
+      workspaceId: 'workspace-main',
+      platform: 'EMAIL',
+      platformThreadId: 'customer@example.test',
+      contactName: 'Customer',
+      messages: [],
+    });
+    const sender = await import('@/lib/email/sender');
+    vi.mocked(sender.sendEmail).mockRejectedValueOnce(new Error('SMTP rejected message'));
+
+    const req = new Request('http://localhost:3000/api/inbox/threads/thread-email/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: 'Reply content' }),
+    });
+
+    const res = await replyToThread(req, { params: Promise.resolve({ id: 'thread-email' }) });
+    expect(res.status).toBe(502);
+    const data = await res.json();
+    expect(data.error).toContain('no outbound message was recorded');
+    expect(mocks.prisma.message.create).not.toHaveBeenCalled();
   });
 });

@@ -31,25 +31,39 @@ export async function POST(
         return NextResponse.json({ error: 'Thread not found' }, { status: 404 });
       }
 
-      // If this is an email thread, attempt outbound dispatch via nodemailer
+      // Email replies must be delivered before they are recorded as outbound.
       if (thread.platform === 'GMAIL' || thread.platform === 'EMAIL') {
         const recipientEmail = thread.platformThreadId.includes('@')
           ? thread.platformThreadId
           : thread.contactName.includes('@')
           ? thread.contactName
           : null;
-        if (recipientEmail) {
-          try {
-            await sendEmail({
-              workspaceId: auth.workspaceId,
-              to: recipientEmail,
-              subject: `Re: Conversation with ${auth.workspace.name}`,
-              text: parsed.data.content,
-            });
-          } catch (err) {
-            console.warn('Physical email send skipped or failed; recording message in thread', err);
-          }
+        if (!recipientEmail) {
+          return NextResponse.json(
+            { error: 'This email thread does not have a deliverable recipient address' },
+            { status: 422 },
+          );
         }
+
+        try {
+          await sendEmail({
+            workspaceId: auth.workspaceId,
+            to: recipientEmail,
+            subject: `Re: Conversation with ${auth.workspace.name}`,
+            text: parsed.data.content,
+          });
+        } catch (error) {
+          console.error('Inbox email reply failed', { error: error instanceof Error ? error.name : 'unknown' });
+          return NextResponse.json(
+            { error: 'Email reply could not be delivered; no outbound message was recorded' },
+            { status: 502 },
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: `Replies for ${thread.platform} threads are not available yet` },
+          { status: 501 },
+        );
       }
 
       const newMsg = await prisma.message.create({
