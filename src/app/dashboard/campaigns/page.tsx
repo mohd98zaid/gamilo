@@ -928,147 +928,179 @@ export default function CampaignsPage() {
             {campaigns.map((camp) => (
               <div
                 key={camp.id}
-                className="p-5 rounded-2xl bg-surface border border-border flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-border/80 transition-all"
+                className="p-5 rounded-3xl bg-surface border border-border hover:border-border/80 transition-all space-y-4 shadow-sm"
               >
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-foreground">{camp.name}</span>
+                {/* Top Row: Name, Status Badge, and Key Metrics */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+                    <span className="font-bold text-base text-foreground tracking-tight truncate">
+                      {camp.name}
+                    </span>
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                         camp.status === 'COMPLETED'
-                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                           : camp.status === 'SENDING'
-                          ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                          ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30 animate-pulse'
+                          : camp.status === 'PAUSED'
+                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                           : 'bg-surface-2 text-foreground-subtle border border-border'
                       }`}
                     >
                       {camp.status}
                     </span>
                   </div>
-                  <div className="text-xs text-foreground-muted flex items-center gap-2">
-                    <span>Subject: <strong className="text-foreground">{camp.subject}</strong></span>
-                  </div>
-                  <div className="text-[11px] text-foreground-subtle flex items-center gap-3 pt-1">
-                    <span>{camp.totalRecipients} recipients</span>
-                    <span>·</span>
-                    <span className="text-emerald-400">{camp.totalSent} sent</span>
+
+                  {/* Metrics Badges / Pills */}
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="px-2.5 py-1 rounded-xl bg-surface-2 border border-border text-foreground-muted whitespace-nowrap flex items-center gap-1.5">
+                      <Users className="w-3.5 h-3.5 text-blue-400" />
+                      <span><strong className="text-foreground">{camp.totalRecipients}</strong> recipients</span>
+                    </span>
+
+                    <span className="px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 whitespace-nowrap flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                      <span><strong>{camp.totalSent}</strong> sent</span>
+                    </span>
+
                     {camp.totalFailed > 0 && (
-                      <>
-                        <span>·</span>
-                        <span className="text-red-400">{camp.totalFailed} failed</span>
-                      </>
+                      <span className="px-2.5 py-1 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 whitespace-nowrap flex items-center gap-1.5">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-400" />
+                        <span><strong>{camp.totalFailed}</strong> failed</span>
+                      </span>
                     )}
-                    <span>·</span>
-                    <span>Created {new Date(camp.createdAt).toLocaleDateString()}</span>
+
+                    <span className="px-2.5 py-1 rounded-xl bg-surface-2/60 border border-border/80 text-foreground-subtle text-[11px] whitespace-nowrap flex items-center gap-1.5">
+                      <Clock className="w-3 h-3 text-foreground-subtle" />
+                      <span>{new Date(camp.createdAt).toLocaleDateString()}</span>
+                    </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    onClick={() => handleOpenEdit(camp)}
-                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
-                    title="Edit Campaign"
-                  >
-                    <Pencil className="w-3.5 h-3.5 text-foreground-muted" />
-                    <span>Edit</span>
-                  </button>
+                {/* Middle Row: Full-width Subject Line */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/50 border border-border/70 flex items-start gap-2.5 text-xs">
+                  <span className="font-semibold text-foreground-muted shrink-0 text-[11px] uppercase tracking-wider pt-0.5">
+                    Subject:
+                  </span>
+                  <p className="text-foreground font-medium break-words leading-relaxed select-all">
+                    {camp.subject || <span className="text-foreground-subtle italic">No subject line configured</span>}
+                  </p>
+                </div>
 
-                  <button
-                    onClick={() => handleOpenDuplicate(camp)}
-                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
-                    title="Duplicate Campaign"
-                  >
-                    <Copy className="w-3.5 h-3.5 text-foreground-muted" />
-                    <span>Duplicate</span>
-                  </button>
-
-                  <button
-                    onClick={() => handleOpenSplit(camp)}
-                    disabled={camp.totalRecipients === 0}
-                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    title="Split campaign recipients into batches or by status"
-                  >
-                    <Split className="w-3.5 h-3.5 text-blue-400" />
-                    <span>Split</span>
-                  </button>
-
-                  {campaigns.length >= 2 && (
+                {/* Bottom Row: Actions Toolbar */}
+                <div className="pt-2 border-t border-border/60 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+                  {/* Left Action Group: Management & Organization */}
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
-                      onClick={() => handleOpenMerge(camp)}
-                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
-                      title="Merge this campaign with other campaigns"
+                      onClick={() => handleOpenRecipients(camp)}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors shadow-sm"
+                      title="View, add, search, and manage recipients"
                     >
-                      <Merge className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Merge</span>
+                      <Users className="w-3.5 h-3.5 text-brand" />
+                      <span>Manage Recipients ({camp.totalRecipients})</span>
                     </button>
-                  )}
 
-                  <button
-                    onClick={() => handleOpenRecipients(camp)}
-                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
-                  >
-                    <Users className="w-3.5 h-3.5" />
-                    <span>Manage Recipients ({camp.totalRecipients})</span>
-                  </button>
+                    <button
+                      onClick={() => handleOpenEdit(camp)}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors"
+                      title="Edit Campaign Subject & Body"
+                    >
+                      <Pencil className="w-3.5 h-3.5 text-foreground-muted" />
+                      <span>Edit</span>
+                    </button>
 
-                  <button
-                    onClick={() => handleExportEmailIds(camp)}
-                    disabled={isExportingEmails === camp.id || camp.totalRecipients === 0}
-                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                    title="Download recipient email IDs as JSON"
-                  >
-                    {isExportingEmails === camp.id ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Download className="w-3.5 h-3.5 text-foreground-muted" />
+                    <button
+                      onClick={() => handleOpenDuplicate(camp)}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors"
+                      title="Duplicate Campaign"
+                    >
+                      <Copy className="w-3.5 h-3.5 text-foreground-muted" />
+                      <span>Duplicate</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleOpenSplit(camp)}
+                      disabled={camp.totalRecipients === 0}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      title="Split campaign recipients into batches or by status"
+                    >
+                      <Split className="w-3.5 h-3.5 text-blue-400" />
+                      <span>Split</span>
+                    </button>
+
+                    {campaigns.length >= 2 && (
+                      <button
+                        onClick={() => handleOpenMerge(camp)}
+                        className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors"
+                        title="Merge this campaign with other campaigns"
+                      >
+                        <Merge className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Merge</span>
+                      </button>
                     )}
-                    <span>{isExportingEmails === camp.id ? 'Exporting...' : 'Export JSON'}</span>
-                  </button>
 
-                  {camp.totalFailed > 0 && (
                     <button
-                      onClick={() => handleRetryFailedCampaign(camp.id)}
-                      disabled={isRetryingFailed === camp.id}
-                      className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
-                      title="Reset failed recipients to Pending so they can be re-sent"
+                      onClick={() => handleExportEmailIds(camp)}
+                      disabled={isExportingEmails === camp.id || camp.totalRecipients === 0}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border hover:border-border/80 flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                      title="Download recipient email IDs as JSON"
                     >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isRetryingFailed === camp.id ? 'animate-spin' : ''}`} />
-                      <span>Retry Failed ({camp.totalFailed})</span>
+                      {isExportingEmails === camp.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5 text-foreground-muted" />
+                      )}
+                      <span>{isExportingEmails === camp.id ? 'Exporting...' : 'Export JSON'}</span>
                     </button>
-                  )}
+                  </div>
 
-                  {camp.totalSent > 0 && (
-                    <button
-                      onClick={() => handleResendAll(camp)}
-                      disabled={isResendingAll === camp.id}
-                      className="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
-                      title="Resend this campaign to every recipient, including recipients already sent"
-                    >
-                      <RefreshCw className={`w-3.5 h-3.5 ${isResendingAll === camp.id ? 'animate-spin' : ''}`} />
-                      <span>{isResendingAll === camp.id ? 'Resending...' : 'Resend All'}</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => handleSendCampaign(camp.id)}
-                    disabled={isSending === camp.id || camp.totalRecipients === 0}
-                    className="px-3.5 py-1.5 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shadow-brand/20"
-                  >
-                    {isSending === camp.id ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Send className="w-3.5 h-3.5" />
+                  {/* Right Action Group: Dispatch, Retries & Deletion */}
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    {camp.totalFailed > 0 && (
+                      <button
+                        onClick={() => handleRetryFailedCampaign(camp.id)}
+                        disabled={isRetryingFailed === camp.id}
+                        className="px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-sm"
+                        title="Reset failed recipients to Pending so they can be re-sent"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isRetryingFailed === camp.id ? 'animate-spin' : ''}`} />
+                        <span>Retry Failed ({camp.totalFailed})</span>
+                      </button>
                     )}
-                    <span>{isSending === camp.id ? 'Sending...' : 'Send Campaign'}</span>
-                  </button>
 
-                  <button
-                    onClick={() => handleDeleteCampaign(camp.id)}
-                    className="p-2 rounded-xl bg-surface-2 hover:bg-surface text-foreground-subtle hover:text-red-400 border border-border transition-colors"
-                    title="Delete Campaign"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                    {camp.totalSent > 0 && (
+                      <button
+                        onClick={() => handleResendAll(camp)}
+                        disabled={isResendingAll === camp.id}
+                        className="px-3 py-1.5 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-sm"
+                        title="Resend this campaign to every recipient, including recipients already sent"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${isResendingAll === camp.id ? 'animate-spin' : ''}`} />
+                        <span>{isResendingAll === camp.id ? 'Resending...' : 'Resend All'}</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleSendCampaign(camp.id)}
+                      disabled={isSending === camp.id || camp.totalRecipients === 0}
+                      className="px-4 py-1.5 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-brand/20"
+                    >
+                      {isSending === camp.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Send className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isSending === camp.id ? 'Sending...' : 'Send Campaign'}</span>
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteCampaign(camp.id)}
+                      className="p-2 rounded-xl bg-surface-2 hover:bg-surface text-foreground-subtle hover:text-red-400 border border-border hover:border-red-500/30 transition-colors"
+                      title="Delete Campaign"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
