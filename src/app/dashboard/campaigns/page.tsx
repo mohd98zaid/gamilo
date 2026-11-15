@@ -20,6 +20,9 @@ import {
   ShieldCheck,
   Search,
   Copy,
+  Download,
+  Split,
+  Merge,
 } from 'lucide-react';
 import { DashboardTopbar } from '@/components/DashboardTopbar';
 import { inferContactDetails } from '@/lib/email/contact-infer';
@@ -78,6 +81,7 @@ export default function CampaignsPage() {
   const [isRetryingFailed, setIsRetryingFailed] = useState<string | null>(null);
   const [isRetryingSingle, setIsRetryingSingle] = useState<string | null>(null);
   const [isRemovingRecipient, setIsRemovingRecipient] = useState<string | null>(null);
+  const [isExportingEmails, setIsExportingEmails] = useState<string | null>(null);
   const [sendFeedback, setSendFeedback] = useState<string | null>(null);
 
   // Duplicate Campaign State
@@ -86,6 +90,31 @@ export default function CampaignsPage() {
   const [duplicateName, setDuplicateName] = useState('');
   const [duplicateWhat, setDuplicateWhat] = useState<'BOTH' | 'EMAIL_ONLY' | 'RECIPIENTS_ONLY'>('BOTH');
   const [isDuplicating, setIsDuplicating] = useState(false);
+
+  // Split Campaign State
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [campaignToSplit, setCampaignToSplit] = useState<Campaign | null>(null);
+  const [splitMode, setSplitMode] = useState<'BATCH_SIZE' | 'NUM_PARTS' | 'STATUS'>('BATCH_SIZE');
+  const [splitBatchSize, setSplitBatchSize] = useState<number>(25);
+  const [splitNumParts, setSplitNumParts] = useState<number>(2);
+  const [splitStatuses, setSplitStatuses] = useState<string[]>(['PENDING', 'FAILED', 'SENT']);
+  const [splitNamePrefix, setSplitNamePrefix] = useState<string>('');
+  const [splitRecipientFilter, setSplitRecipientFilter] = useState<'ALL' | 'PENDING' | 'SENT' | 'FAILED'>('ALL');
+  const [splitCopyEmail, setSplitCopyEmail] = useState<boolean>(true);
+  const [splitMoveRecipients, setSplitMoveRecipients] = useState<boolean>(false);
+  const [isSplitting, setIsSplitting] = useState<boolean>(false);
+
+  // Merge Campaigns State
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [selectedMergeSourceIds, setSelectedMergeSourceIds] = useState<string[]>([]);
+  const [mergeTargetMode, setMergeTargetMode] = useState<'NEW' | 'EXISTING'>('NEW');
+  const [mergeTargetId, setMergeTargetId] = useState<string>('');
+  const [mergeNewName, setMergeNewName] = useState<string>('');
+  const [mergeTemplateId, setMergeTemplateId] = useState<string>('');
+  const [mergeStatusFilter, setMergeStatusFilter] = useState<'ALL' | 'PENDING' | 'SENT' | 'FAILED'>('ALL');
+  const [mergeResetStatus, setMergeResetStatus] = useState<boolean>(true);
+  const [mergeDeleteSources, setMergeDeleteSources] = useState<boolean>(false);
+  const [isMerging, setIsMerging] = useState<boolean>(false);
 
   // Source campaign copy in Create Modal
   const [selectedSourceCampaignId, setSelectedSourceCampaignId] = useState('');
@@ -138,6 +167,129 @@ export default function CampaignsPage() {
       alert('Network error while duplicating campaign');
     } finally {
       setIsDuplicating(false);
+    }
+  }
+
+  function handleOpenSplit(camp: Campaign) {
+    setCampaignToSplit(camp);
+    setSplitNamePrefix(camp.name);
+    const total = camp.totalRecipients || 50;
+    if (total <= 50) setSplitBatchSize(Math.max(1, Math.floor(total / 2)) || 10);
+    else if (total <= 100) setSplitBatchSize(25);
+    else setSplitBatchSize(50);
+    setSplitNumParts(2);
+    setSplitMode('BATCH_SIZE');
+    setSplitStatuses(['PENDING', 'FAILED', 'SENT']);
+    setSplitRecipientFilter('ALL');
+    setSplitCopyEmail(true);
+    setSplitMoveRecipients(false);
+    setIsSplitModalOpen(true);
+  }
+
+  async function handleConfirmSplit() {
+    if (!campaignToSplit) return;
+    setIsSplitting(true);
+    try {
+      const res = await fetch(`/api/campaigns/${campaignToSplit.id}/split`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: splitMode,
+          batchSize: splitBatchSize,
+          numParts: splitNumParts,
+          statuses: splitStatuses,
+          namePrefix: splitNamePrefix.trim() || campaignToSplit.name,
+          copyEmail: splitCopyEmail,
+          moveRecipients: splitMoveRecipients,
+          recipientStatusFilter: splitRecipientFilter,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsSplitModalOpen(false);
+        setCampaignToSplit(null);
+        await loadData();
+        setSendFeedback(data.message || `Split into ${data.totalCreated} campaigns!`);
+      } else {
+        alert(data.error || 'Failed to split campaign');
+      }
+    } catch {
+      alert('Network error while splitting campaign');
+    } finally {
+      setIsSplitting(false);
+    }
+  }
+
+  function handleOpenMerge(initialCampaign?: Campaign) {
+    if (initialCampaign) {
+      const other = campaigns.find((c) => c.id !== initialCampaign.id);
+      setSelectedMergeSourceIds(other ? [initialCampaign.id, other.id] : [initialCampaign.id]);
+      setMergeNewName(`${initialCampaign.name} (Merged)`);
+      setMergeTemplateId(initialCampaign.id);
+      setMergeTargetId(initialCampaign.id);
+    } else {
+      if (campaigns.length >= 2) {
+        setSelectedMergeSourceIds([campaigns[0].id, campaigns[1].id]);
+        setMergeNewName(`Merged Campaigns (${new Date().toLocaleDateString()})`);
+        setMergeTemplateId(campaigns[0].id);
+        setMergeTargetId(campaigns[0].id);
+      } else if (campaigns.length === 1) {
+        setSelectedMergeSourceIds([campaigns[0].id]);
+        setMergeNewName(`${campaigns[0].name} (Merged)`);
+        setMergeTemplateId(campaigns[0].id);
+        setMergeTargetId(campaigns[0].id);
+      }
+    }
+    setMergeTargetMode('NEW');
+    setMergeStatusFilter('ALL');
+    setMergeResetStatus(true);
+    setMergeDeleteSources(false);
+    setIsMergeModalOpen(true);
+  }
+
+  function handleToggleMergeSource(id: string) {
+    setSelectedMergeSourceIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  }
+
+  async function handleConfirmMerge() {
+    if (selectedMergeSourceIds.length < 2) {
+      alert('Please select at least 2 campaigns to merge.');
+      return;
+    }
+    if (mergeTargetMode === 'NEW' && !mergeNewName.trim()) {
+      alert('Please enter a name for the new merged campaign.');
+      return;
+    }
+    setIsMerging(true);
+    try {
+      const res = await fetch('/api/campaigns/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceCampaignIds: selectedMergeSourceIds,
+          targetCampaignId: mergeTargetMode === 'EXISTING' ? mergeTargetId : undefined,
+          newCampaignName: mergeTargetMode === 'NEW' ? mergeNewName.trim() : undefined,
+          templateCampaignId: mergeTemplateId || undefined,
+          recipientStatusFilter: mergeStatusFilter,
+          resetStatusToPending: mergeResetStatus,
+          deleteSourceCampaigns: mergeDeleteSources,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setIsMergeModalOpen(false);
+        setSelectedMergeSourceIds([]);
+        await loadData();
+        setSendFeedback(data.message || `Successfully merged campaigns!`);
+      } else {
+        alert(data.error || 'Failed to merge campaigns');
+      }
+    } catch {
+      alert('Network error while merging campaigns');
+    } finally {
+      setIsMerging(false);
     }
   }
 
@@ -470,6 +622,12 @@ export default function CampaignsPage() {
     }
   }
 
+  async function handleSendPendingFromModal() {
+    if (!activeCampaign || countPending === 0) return;
+    await handleSendCampaign(activeCampaign.id);
+    await handleOpenRecipients(activeCampaign);
+  }
+
   async function handleResendAll(camp: Campaign) {
     if (camp.totalSent === 0) return;
     if (!confirm(`Resend this campaign to all ${camp.totalRecipients} recipients, including recipients already marked sent?`)) return;
@@ -561,6 +719,34 @@ export default function CampaignsPage() {
       alert('Error removing recipient');
     } finally {
       setIsRemovingRecipient(null);
+    }
+  }
+
+  async function handleExportEmailIds(camp: Campaign) {
+    if (camp.totalRecipients === 0) return;
+    setIsExportingEmails(camp.id);
+
+    try {
+      const res = await fetch(`/api/campaigns/${camp.id}/recipients/export`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to export email IDs');
+        return;
+      }
+
+      const blob = await res.blob();
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `${camp.name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'campaign'}-email-ids.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(downloadUrl);
+    } catch {
+      alert('Network error while exporting email IDs');
+    } finally {
+      setIsExportingEmails(null);
     }
   }
 
@@ -700,12 +886,24 @@ export default function CampaignsPage() {
               Configure merge variables (<code>{'{{name}}'}</code>, <code>{'{{company}}'}</code>) and send in batches
             </p>
           </div>
-          <button
-            onClick={handleOpenCreate}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white text-xs font-bold transition-all shadow-md shadow-brand/20"
-          >
-            <Plus className="w-4 h-4" /> New Campaign
-          </button>
+          <div className="flex items-center gap-2">
+            {campaigns.length >= 2 && (
+              <button
+                onClick={() => handleOpenMerge()}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-surface-2 hover:bg-surface border border-border text-foreground text-xs font-semibold transition-all shadow-sm"
+                title="Merge 2 or more campaigns on basis of recipients"
+              >
+                <Merge className="w-3.5 h-3.5 text-purple-400" />
+                <span>Merge Campaigns</span>
+              </button>
+            )}
+            <button
+              onClick={handleOpenCreate}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 text-white text-xs font-bold transition-all shadow-md shadow-brand/20"
+            >
+              <Plus className="w-4 h-4" /> New Campaign
+            </button>
+          </div>
         </div>
 
         {/* Campaigns List */}
@@ -785,11 +983,46 @@ export default function CampaignsPage() {
                   </button>
 
                   <button
+                    onClick={() => handleOpenSplit(camp)}
+                    disabled={camp.totalRecipients === 0}
+                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    title="Split campaign recipients into batches or by status"
+                  >
+                    <Split className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Split</span>
+                  </button>
+
+                  {campaigns.length >= 2 && (
+                    <button
+                      onClick={() => handleOpenMerge(camp)}
+                      className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
+                      title="Merge this campaign with other campaigns"
+                    >
+                      <Merge className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Merge</span>
+                    </button>
+                  )}
+
+                  <button
                     onClick={() => handleOpenRecipients(camp)}
                     className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors"
                   >
                     <Users className="w-3.5 h-3.5" />
                     <span>Manage Recipients ({camp.totalRecipients})</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleExportEmailIds(camp)}
+                    disabled={isExportingEmails === camp.id || camp.totalRecipients === 0}
+                    className="px-3 py-1.5 rounded-xl bg-surface-2 hover:bg-surface text-foreground text-xs font-semibold border border-border flex items-center gap-1.5 transition-colors disabled:opacity-50"
+                    title="Download recipient email IDs as JSON"
+                  >
+                    {isExportingEmails === camp.id ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Download className="w-3.5 h-3.5 text-foreground-muted" />
+                    )}
+                    <span>{isExportingEmails === camp.id ? 'Exporting...' : 'Export JSON'}</span>
                   </button>
 
                   {camp.totalFailed > 0 && (
@@ -1248,6 +1481,496 @@ export default function CampaignsPage() {
           </div>
         )}
 
+        {/* Split Campaign Modal */}
+        {isSplitModalOpen && campaignToSplit && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+                    <Split className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">Split Campaign</h3>
+                    <p className="text-xs text-foreground-subtle">
+                      Divide &quot;{campaignToSplit.name}&quot; on basis of recipients ({campaignToSplit.totalRecipients} contacts)
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsSplitModalOpen(false)}
+                  className="text-foreground-subtle hover:text-foreground text-sm p-1.5 rounded-xl hover:bg-surface-2 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Campaign Prefix */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+                    Campaign Name Prefix
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={splitNamePrefix}
+                    onChange={(e) => setSplitNamePrefix(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand font-medium"
+                    placeholder="e.g. Outreach - Batch"
+                  />
+                  <p className="text-[11px] text-foreground-subtle mt-1">
+                    Split campaigns will be named: <code>{splitNamePrefix || campaignToSplit.name} - Part 1</code>, <code>Part 2</code>, etc.
+                  </p>
+                </div>
+
+                {/* Recipient Source Filter */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-1.5">
+                    Which recipients to split?
+                  </label>
+                  <select
+                    value={splitRecipientFilter}
+                    onChange={(e) => setSplitRecipientFilter(e.target.value as any)}
+                    className="w-full px-3.5 py-2 rounded-xl bg-surface-2 border border-border text-foreground text-xs focus:outline-none focus:border-brand"
+                  >
+                    <option value="ALL">All Recipients ({campaignToSplit.totalRecipients})</option>
+                    <option value="PENDING">Pending Only (Unsent contacts)</option>
+                    <option value="FAILED">Failed Only (To retry in a new batch)</option>
+                    <option value="SENT">Sent Only</option>
+                  </select>
+                </div>
+
+                {/* Split Mode Options */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-2">
+                    How to split recipients?
+                  </label>
+                  <div className="space-y-2">
+                    {/* Mode 1: Batch Size */}
+                    <label
+                      onClick={() => setSplitMode('BATCH_SIZE')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        splitMode === 'BATCH_SIZE'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="splitMode"
+                        value="BATCH_SIZE"
+                        checked={splitMode === 'BATCH_SIZE'}
+                        onChange={() => setSplitMode('BATCH_SIZE')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs flex-1">
+                        <span className="font-bold text-foreground block">
+                          By Batch Size (Contacts per campaign)
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Divide into campaigns with a maximum number of recipients each.
+                        </span>
+                        {splitMode === 'BATCH_SIZE' && (
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <span className="text-xs font-semibold text-foreground">Batch size:</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={10000}
+                              value={splitBatchSize}
+                              onChange={(e) => setSplitBatchSize(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-24 px-2.5 py-1 rounded-lg bg-surface border border-border text-xs text-foreground font-mono focus:outline-none focus:border-brand"
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                              (creates ~{Math.ceil((campaignToSplit.totalRecipients || 1) / Math.max(1, splitBatchSize))} campaigns)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+
+                    {/* Mode 2: Equal Parts */}
+                    <label
+                      onClick={() => setSplitMode('NUM_PARTS')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        splitMode === 'NUM_PARTS'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="splitMode"
+                        value="NUM_PARTS"
+                        checked={splitMode === 'NUM_PARTS'}
+                        onChange={() => setSplitMode('NUM_PARTS')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs flex-1">
+                        <span className="font-bold text-foreground block">
+                          Into Equal Parts (Equal batches)
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Divide the recipient list evenly across N campaigns.
+                        </span>
+                        {splitMode === 'NUM_PARTS' && (
+                          <div className="mt-2.5 flex items-center gap-2">
+                            <span className="text-xs font-semibold text-foreground">Number of parts:</span>
+                            <input
+                              type="number"
+                              min={2}
+                              max={50}
+                              value={splitNumParts}
+                              onChange={(e) => setSplitNumParts(Math.max(2, parseInt(e.target.value) || 2))}
+                              className="w-20 px-2.5 py-1 rounded-lg bg-surface border border-border text-xs text-foreground font-mono focus:outline-none focus:border-brand"
+                            />
+                            <span className="text-[11px] text-foreground-subtle">
+                              (~{Math.ceil((campaignToSplit.totalRecipients || 0) / Math.max(2, splitNumParts))} contacts each)
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+
+                    {/* Mode 3: By Status */}
+                    <label
+                      onClick={() => setSplitMode('STATUS')}
+                      className={`p-3.5 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        splitMode === 'STATUS'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="splitMode"
+                        value="STATUS"
+                        checked={splitMode === 'STATUS'}
+                        onChange={() => setSplitMode('STATUS')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs flex-1">
+                        <span className="font-bold text-foreground block">
+                          By Recipient Status (Pending vs Sent vs Failed)
+                        </span>
+                        <span className="text-[11px] text-foreground-subtle block mt-0.5 leading-relaxed">
+                          Creates separate campaigns for each contact status so you can follow up or retry separately.
+                        </span>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Additional Options */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border space-y-2.5 text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={splitCopyEmail}
+                      onChange={(e) => setSplitCopyEmail(e.target.checked)}
+                      className="rounded border-border text-brand focus:ring-brand w-4 h-4"
+                    />
+                    <span className="text-foreground font-medium">
+                      Copy email template (Subject, Body & Sender Account) to split campaigns
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={splitMoveRecipients}
+                      onChange={(e) => setSplitMoveRecipients(e.target.checked)}
+                      className="rounded border-border text-brand focus:ring-brand w-4 h-4"
+                    />
+                    <span className="text-foreground font-medium">
+                      Move contacts (removes from original campaign)
+                    </span>
+                  </label>
+                  <p className="text-[10px] text-foreground-subtle pl-6">
+                    {splitMoveRecipients
+                      ? '⚠️ Contacts will be removed from this campaign and transferred into the new split campaigns.'
+                      : '✅ Non-destructive: Contacts are cloned as fresh Pending recipients in the new campaigns, leaving the original campaign intact.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 sm:p-4 px-5 border-t border-border flex items-center justify-end gap-2.5 shrink-0 bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setIsSplitModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmSplit}
+                  disabled={isSplitting || !splitNamePrefix.trim()}
+                  className="px-4 py-2 rounded-xl bg-brand hover:bg-brand-600 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-brand/20 transition-all"
+                >
+                  {isSplitting ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Split className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isSplitting ? 'Splitting...' : 'Split Campaign'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Merge Campaigns Modal */}
+        {isMergeModalOpen && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
+            <div className="bg-surface border border-brand/40 rounded-3xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
+                    <Merge className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base text-foreground">Merge Campaigns</h3>
+                    <p className="text-xs text-foreground-subtle">
+                      Combine recipients from multiple campaigns with automatic email deduplication
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsMergeModalOpen(false)}
+                  className="text-foreground-subtle hover:text-foreground text-sm p-1.5 rounded-xl hover:bg-surface-2 transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+                {/* Select Campaigns to Merge */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold text-foreground-muted">
+                      Select campaigns to merge (choose 2 or more)
+                    </label>
+                    <span className="text-[11px] text-foreground-subtle font-mono">
+                      {selectedMergeSourceIds.length} selected
+                    </span>
+                  </div>
+                  <div className="max-h-40 overflow-y-auto space-y-1.5 border border-border rounded-xl p-2 bg-surface-2/40">
+                    {campaigns.map((camp) => {
+                      const isSelected = selectedMergeSourceIds.includes(camp.id);
+                      return (
+                        <label
+                          key={camp.id}
+                          className={`p-2.5 rounded-xl border flex items-center justify-between gap-2.5 cursor-pointer text-xs transition-all ${
+                            isSelected
+                              ? 'bg-purple-500/10 border-purple-500/40 text-foreground font-semibold'
+                              : 'bg-surface border-border/80 text-foreground-muted hover:border-border'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleMergeSource(camp.id)}
+                              className="rounded border-border text-purple-500 focus:ring-purple-400 w-4 h-4 shrink-0"
+                            />
+                            <span className="truncate">{camp.name}</span>
+                          </div>
+                          <span className="text-[11px] text-foreground-subtle shrink-0 font-mono">
+                            {camp.totalRecipients} recipients
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Destination */}
+                <div>
+                  <label className="block text-xs font-semibold text-foreground-muted mb-2">
+                    Merge Destination
+                  </label>
+                  <div className="space-y-2">
+                    <label
+                      onClick={() => setMergeTargetMode('NEW')}
+                      className={`p-3 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        mergeTargetMode === 'NEW'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="mergeTargetMode"
+                        value="NEW"
+                        checked={mergeTargetMode === 'NEW'}
+                        onChange={() => setMergeTargetMode('NEW')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs flex-1">
+                        <span className="font-bold text-foreground block">
+                          Create a New Merged Campaign
+                        </span>
+                        {mergeTargetMode === 'NEW' && (
+                          <div className="mt-2.5 space-y-2">
+                            <input
+                              type="text"
+                              required
+                              value={mergeNewName}
+                              onChange={(e) => setMergeNewName(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand font-medium"
+                              placeholder="New campaign name"
+                            />
+                            <div>
+                              <span className="text-[11px] text-foreground-subtle block mb-1">
+                                Template to use for Subject & Body:
+                              </span>
+                              <select
+                                value={mergeTemplateId}
+                                onChange={(e) => setMergeTemplateId(e.target.value)}
+                                className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand"
+                              >
+                                {campaigns
+                                  .filter((c) => selectedMergeSourceIds.includes(c.id))
+                                  .map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                      {c.name} (Subject: {c.subject ? `"${c.subject.slice(0, 30)}..."` : 'None'})
+                                    </option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+
+                    <label
+                      onClick={() => setMergeTargetMode('EXISTING')}
+                      className={`p-3 rounded-2xl border flex items-start gap-3 cursor-pointer transition-all ${
+                        mergeTargetMode === 'EXISTING'
+                          ? 'bg-brand/10 border-brand text-foreground shadow-sm'
+                          : 'bg-surface-2 border-border text-foreground-muted hover:border-border/80'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="mergeTargetMode"
+                        value="EXISTING"
+                        checked={mergeTargetMode === 'EXISTING'}
+                        onChange={() => setMergeTargetMode('EXISTING')}
+                        className="mt-0.5 text-brand focus:ring-brand"
+                      />
+                      <div className="text-xs flex-1">
+                        <span className="font-bold text-foreground block">
+                          Merge into an Existing Campaign
+                        </span>
+                        {mergeTargetMode === 'EXISTING' && (
+                          <div className="mt-2.5">
+                            <select
+                              value={mergeTargetId}
+                              onChange={(e) => setMergeTargetId(e.target.value)}
+                              className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand"
+                            >
+                              {campaigns
+                                .filter((c) => selectedMergeSourceIds.includes(c.id))
+                                .map((c) => (
+                                  <option key={c.id} value={c.id}>
+                                    {c.name} ({c.totalRecipients} recipients currently)
+                                  </option>
+                                ))}
+                            </select>
+                            <span className="text-[10px] text-foreground-subtle block mt-1">
+                              Recipients from the other selected campaigns will be appended into this campaign.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Recipient Filter & Deduplication Options */}
+                <div className="p-3.5 rounded-2xl bg-surface-2/60 border border-border space-y-2.5 text-xs">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-foreground-muted mb-1">
+                      Filter which recipients to include:
+                    </label>
+                    <select
+                      value={mergeStatusFilter}
+                      onChange={(e) => setMergeStatusFilter(e.target.value as any)}
+                      className="w-full px-3 py-1.5 rounded-xl bg-surface border border-border text-xs text-foreground focus:outline-none focus:border-brand"
+                    >
+                      <option value="ALL">All Recipients (Recommended)</option>
+                      <option value="PENDING">Pending Only</option>
+                      <option value="FAILED">Failed Only</option>
+                      <option value="SENT">Sent Only</option>
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input
+                      type="checkbox"
+                      checked={mergeResetStatus}
+                      onChange={(e) => setMergeResetStatus(e.target.checked)}
+                      className="rounded border-border text-brand focus:ring-brand w-4 h-4"
+                    />
+                    <span className="text-foreground font-medium">
+                      Reset all merged recipients to PENDING (ready to send)
+                    </span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={mergeDeleteSources}
+                      onChange={(e) => setMergeDeleteSources(e.target.checked)}
+                      className="rounded border-border text-red-500 focus:ring-red-400 w-4 h-4"
+                    />
+                    <span className="text-foreground font-medium text-red-300">
+                      Delete original source campaigns after merge
+                    </span>
+                  </label>
+
+                  <div className="p-2 rounded-xl bg-surface border border-border/80 text-[11px] text-emerald-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Automatic deduplication enabled: Duplicate emails across merged campaigns are automatically unified.</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-3 sm:p-4 px-5 border-t border-border flex items-center justify-end gap-2.5 shrink-0 bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setIsMergeModalOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-foreground-muted hover:text-foreground"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmMerge}
+                  disabled={isMerging || selectedMergeSourceIds.length < 2 || (mergeTargetMode === 'NEW' && !mergeNewName.trim())}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-purple-600/20 transition-all"
+                >
+                  {isMerging ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Merge className="w-3.5 h-3.5" />
+                  )}
+                  <span>{isMerging ? 'Merging...' : `Merge (${selectedMergeSourceIds.length}) Campaigns`}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Manage Recipients Modal */}
         {isRecipientsOpen && activeCampaign && (
           <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-hidden">
@@ -1358,6 +2081,18 @@ export default function CampaignsPage() {
                       <Clock className="w-3 h-3" />
                       <span>Pending ({countPending})</span>
                     </button>
+                    {countPending > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleSendPendingFromModal}
+                        disabled={isSending === activeCampaign.id}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-brand/20 text-brand hover:bg-brand/30 border border-brand/30 transition-all shrink-0 disabled:opacity-50"
+                        title="Send only recipients currently marked pending"
+                      >
+                        <Send className="w-3 h-3" />
+                        <span>{isSending === activeCampaign.id ? 'Sending...' : 'Send Pending'}</span>
+                      </button>
+                    )}
                      {countFailed > 0 && (
                       <>
                         <button
@@ -1395,6 +2130,21 @@ export default function CampaignsPage() {
                       >
                         <RefreshCw className={`w-3 h-3 ${isResendingAll === activeCampaign.id ? 'animate-spin' : ''}`} />
                         <span>{isResendingAll === activeCampaign.id ? 'Resending...' : 'Resend All'}</span>
+                      </button>
+                    )}
+
+                    {recipients.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsRecipientsOpen(false);
+                          handleOpenSplit(activeCampaign);
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border border-blue-500/30 transition-all shrink-0"
+                        title="Split this campaign into multiple batches or by status"
+                      >
+                        <Split className="w-3 h-3" />
+                        <span>Split Campaign</span>
                       </button>
                     )}
                   </div>

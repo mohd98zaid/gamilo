@@ -776,6 +776,10 @@ campaign mutations, recipient changes, enrichment, and sending require `EDITOR`.
 | `POST` | `/api/campaigns/:id/recipients` | Import/upsert recipients |
 | `PATCH` | `/api/campaigns/:id/recipients` | Reset failed recipients to pending |
 | `DELETE` | `/api/campaigns/:id/recipients?recipientId=…` | Remove one recipient |
+| `GET` | `/api/campaigns/:id/recipients/export` | Download recipient email IDs as JSON |
+| `POST` | `/api/campaigns/:id/duplicate` | Duplicate campaign with selective email/recipient copying |
+| `POST` | `/api/campaigns/:id/split` | Split campaign into batches or by recipient status |
+| `POST` | `/api/campaigns/merge` | Merge multiple campaigns with automatic email deduplication |
 | `POST` | `/api/campaigns/:id/recipients/ai-enrich` | Infer missing contact fields through NVIDIA |
 | `POST` | `/api/campaigns/:id/send` | Dispatch pending, single, or all recipients |
 
@@ -820,6 +824,11 @@ missing ID, `404` for a missing/out-of-workspace resource, or `500` on failure.
 
 These are session-cookie APIs, not a documented bearer-key API. API-key
 generation alone does not establish API-key authentication for these routes.
+
+The recipient export requires at least `VIEWER` access and is scoped to the
+current workspace. It downloads a file containing the campaign ID/name,
+`exportedAt`, `total`, and an alphabetically sorted `emailIds` array. Names,
+companies, send status, and provider credentials are not included.
 
 ### Other API groups
 
